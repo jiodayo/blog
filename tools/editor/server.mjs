@@ -190,14 +190,62 @@ async function renamePost(from, to) {
 
 // --------------------------------------------------------------------- images
 
+// 本文の表示幅は 720px。Retina 表示を考えても 1600px あれば十分で、
+// スマホで撮った写真（4000px 超）をそのまま入れると git が無駄に重くなる。
+// Astro は形式変換はするが縮小はしないので、入る前にここで縮める。
+const MAX_IMAGE_WIDTH = 1600;
+
+/** sharp は Astro の依存として入っている。無くても動くように読み込みは任意扱い。 */
+async function loadSharp() {
+	try {
+		return (await import('sharp')).default;
+	} catch {
+		return null;
+	}
+}
+
+async function shrinkImage(buffer, ext) {
+	// アニメーションGIFは縮小すると壊れることがあるので触らない
+	if (ext === 'gif') return { buffer, resized: false };
+
+	const sharp = await loadSharp();
+	if (!sharp) return { buffer, resized: false };
+
+	try {
+		const image = sharp(buffer);
+		const { width } = await image.metadata();
+		if (!width || width <= MAX_IMAGE_WIDTH) return { buffer, resized: false, width };
+
+		const out = await image
+			.rotate() // Exif の向きを反映させてから縮小する
+			.resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true })
+			.toBuffer();
+		return { buffer: out, resized: true, widthBefore: width, width: MAX_IMAGE_WIDTH };
+	} catch {
+		// 縮小に失敗しても、元の画像は保存できたほうがよい
+		return { buffer, resized: false };
+	}
+}
+
 async function saveImage(slug, ext, buffer) {
 	if (!IMAGE_EXT.has(ext)) throw new HttpError(400, `対応していない画像形式です: ${ext}`);
 	const safeSlug = SLUG_RE.test(slug) ? slug : 'image';
 	const name = `${safeSlug}-${Date.now()}.${ext}`;
 	await fs.mkdir(IMAGES_DIR, { recursive: true });
-	await fs.writeFile(path.join(IMAGES_DIR, name), buffer);
-	// 記事からの相対パス。Astro が最適化してくれる
-	return { markdownPath: `./images/${name}` };
+
+	const bytesBefore = buffer.length;
+	const shrunk = await shrinkImage(buffer, ext);
+	await fs.writeFile(path.join(IMAGES_DIR, name), shrunk.buffer);
+
+	// 記事からの相対パス。ここから先は Astro が WebP への変換を担当する
+	return {
+		markdownPath: `./images/${name}`,
+		bytesBefore,
+		bytesAfter: shrunk.buffer.length,
+		resized: shrunk.resized,
+		widthBefore: shrunk.widthBefore ?? null,
+		width: shrunk.width ?? null,
+	};
 }
 
 // ------------------------------------------------------------------------ git

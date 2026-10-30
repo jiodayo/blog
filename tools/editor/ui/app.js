@@ -27,7 +27,8 @@ const el = {
 	modal: $('modal'),
 	modalTitle: $('modal-title'),
 	modalLog: $('modal-log'),
-	modalClose: $('modal-close'),
+	modalActions: $('modal-actions'),
+	hint: $('toolbar-hint'),
 };
 
 const state = {
@@ -341,14 +342,35 @@ const MD_ACTIONS = {
 
 // ------------------------------------------------------------------- 画像
 
+const HINT_DEFAULT = '画像はエディタに貼り付け／ドロップでも入ります';
+let hintTimer = null;
+
+/** ツールバーの注記欄に一時的なメッセージを出す */
+function flashHint(text) {
+	el.hint.textContent = text;
+	clearTimeout(hintTimer);
+	hintTimer = setTimeout(() => {
+		el.hint.textContent = HINT_DEFAULT;
+	}, 8000);
+}
+
+const fmtBytes = (n) =>
+	n >= 1024 * 1024 ? `${(n / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`;
+
 async function uploadImage(file) {
 	const ext = (file.name.split('.').pop() || 'png').toLowerCase();
 	setSaveState('画像を保存中…');
-	const { markdownPath } = await api(
+	const r = await api(
 		`/api/images?slug=${encodeURIComponent(state.current || 'image')}&ext=${encodeURIComponent(ext)}`,
 		{ method: 'POST', body: file },
 	);
-	insertAtCursor(`\n![](${markdownPath})\n`);
+	insertAtCursor(`\n![](${r.markdownPath})\n`);
+	if (r.resized) {
+		flashHint(
+			`画像を縮小しました: ${r.widthBefore}px → ${r.width}px` +
+				`（${fmtBytes(r.bytesBefore)} → ${fmtBytes(r.bytesAfter)}）`,
+		);
+	}
 }
 
 async function handleFiles(files) {
@@ -367,6 +389,28 @@ async function handleFiles(files) {
 
 async function publish() {
 	await flushSave();
+
+	// 下書きのまま公開すると、コミットと push はされるのにサイトには何も出ない。
+	// 成功したように見えて何も起きないので、ここで必ず確認する。
+	if (state.current && el.draft.checked) {
+		const choice = await showChoice(
+			'この記事は下書きです',
+			'このまま進めると、変更は GitHub に送られますが、公開サイトには表示されません。\n' +
+				'サイトに出すには下書きを解除する必要があります。',
+			[
+				{ value: 'publish', label: '下書きを解除して公開', primary: true },
+				{ value: 'keep', label: '下書きのまま送る' },
+				{ value: 'cancel', label: 'やめる' },
+			],
+		);
+		if (choice === null || choice === 'cancel') return;
+		if (choice === 'publish') {
+			el.draft.checked = false;
+			scheduleSave();
+			await flushSave();
+		}
+	}
+
 	const title = el.title.value || '記事';
 	const message = prompt('コミットメッセージ', `記事を更新: ${title}`);
 	if (message === null) return;
@@ -396,9 +440,48 @@ async function publish() {
 }
 
 function showModal(title, log) {
+	return showChoice(title, log, [{ value: null, label: '閉じる', primary: true }]);
+}
+
+/**
+ * ボタン付きのモーダルを出し、押された value で解決する Promise を返す。
+ * 背景クリックと Esc は null（＝やめる）扱い。
+ */
+function showChoice(title, log, choices) {
 	el.modalTitle.textContent = title;
 	el.modalLog.textContent = log;
+	el.modalActions.innerHTML = '';
 	el.modal.hidden = false;
+
+	return new Promise((resolve) => {
+		const done = (value) => {
+			el.modal.hidden = true;
+			el.modal.removeEventListener('click', onBackdrop);
+			document.removeEventListener('keydown', onKey);
+			resolve(value);
+		};
+		const onBackdrop = (e) => {
+			if (e.target === el.modal) done(null);
+		};
+		const onKey = (e) => {
+			if (e.key === 'Escape') done(null);
+		};
+
+		for (const c of choices) {
+			const b = document.createElement('button');
+			b.className = `btn${c.primary ? ' btn-primary' : ''}`;
+			b.textContent = c.label;
+			b.addEventListener('click', () => done(c.value));
+			el.modalActions.append(b);
+		}
+		// フォーカスは「やめる」側（最後のボタン）に当てる。
+		// 最初のボタンに当てると、Enter を押しただけで公開まで走ってしまう。
+		// 見た目の強調（btn-primary）と、キーボードの既定動作は別にする。
+		const buttons = el.modalActions.querySelectorAll('button');
+		buttons[buttons.length - 1]?.focus();
+		el.modal.addEventListener('click', onBackdrop);
+		document.addEventListener('keydown', onKey);
+	});
 }
 
 // ------------------------------------------------------------- イベント登録
@@ -418,10 +501,6 @@ el.newPost.addEventListener('click', () => createPost().catch((e) => alert(e.mes
 el.delete.addEventListener('click', () => deletePost().catch((e) => alert(e.message)));
 el.publish.addEventListener('click', () => publish());
 el.reload.addEventListener('click', () => updatePreview());
-el.modalClose.addEventListener('click', () => (el.modal.hidden = true));
-el.modal.addEventListener('click', (e) => {
-	if (e.target === el.modal) el.modal.hidden = true;
-});
 
 el.toolbar.addEventListener('click', (e) => {
 	const action = e.target.closest('button[data-md]')?.dataset.md;

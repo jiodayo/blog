@@ -69,7 +69,7 @@
 					<button data-md="ol" title="番号付き">1.</button>
 					<span class="toolbar-sep"></span>
 					<button id="btn-image" title="画像を追加">🖼 画像</button>
-					<span class="toolbar-hint">画像はエディタに貼り付け／ドロップでも入ります</span>
+					<span class="toolbar-hint" id="toolbar-hint">画像はエディタに貼り付け／ドロップでも入ります</span>
 					<span class="toolbar-grow"></span>
 					<button id="btn-delete" class="danger" title="この記事を削除">削除</button>
 				</div>
@@ -108,9 +108,7 @@
 			<div class="modal-box">
 				<h2 id="modal-title">公開</h2>
 				<pre id="modal-log"></pre>
-				<div class="modal-actions">
-					<button id="modal-close" class="btn">閉じる</button>
-				</div>
+				<div class="modal-actions" id="modal-actions"></div>
 			</div>
 		</div>
 
