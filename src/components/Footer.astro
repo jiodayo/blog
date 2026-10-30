@@ -1,0 +1,39 @@
+---
+import { AUTHOR, SOCIALS } from '../consts';
+
+const today = new Date();
+---
+
+<footer>
+	<div class="links">
+		{SOCIALS.map((s) => <a href={s.href} target="_blank" rel="me noopener">{s.label}</a>)}
+		<a href="/rss.xml">RSS</a>
+	</div>
+	<p class="copyright">&copy; {today.getFullYear()} {AUTHOR}</p>
+</footer>
+<style>
+	footer {
+		padding: 2em 1em 4em 1em;
+		background: linear-gradient(var(--gray-gradient)) no-repeat;
+		color: rgb(var(--gray));
+		text-align: center;
+		font-size: 0.9em;
+	}
+	.links {
+		display: flex;
+		justify-content: center;
+		gap: 1.25em;
+		margin-bottom: 0.75em;
+	}
+	.links a {
+		color: rgb(var(--gray));
+		text-decoration: none;
+	}
+	.links a:hover {
+		color: var(--accent);
+		text-decoration: underline;
+	}
+	.copyright {
+		margin: 0;
+	}
+</style>
