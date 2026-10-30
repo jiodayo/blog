@@ -1,7 +1,13 @@
-# jiodayo の個人サイト
+# jiodayo のブログ
+
+https://jiodayo.github.io/blog/
 
 Astro で作った静的サイト。`main` に push すると GitHub Actions が
 ビルドして GitHub Pages に公開する。
+
+ルートの `jiodayo.github.io` には別のサイト（合言葉つきの日記）が動いているため、
+このブログは `blog` リポジトリに置き、URL に `/blog/` が挟まる形にしている。
+そのため `astro.config.mjs` に `base: '/blog'` を設定してある。
 
 ## 日常の使い方
 
@@ -59,30 +65,36 @@ pubDate: '2026-10-30'
 | `src/components/Footer.astro` | 下部の表示 |
 | `src/styles/global.css` | 全体の見た目（色・文字サイズ・余白） |
 | `src/layouts/BlogPost.astro` | 記事ページの枠組み |
-| `astro.config.mjs` | 公開URL（`site`） |
+| `astro.config.mjs` | 公開URL（`site`）とサブパス（`base`） |
+| `src/lib/url.ts` | サイト内リンクに `base` を付けるヘルパー |
 | `tools/editor/` | 編集画面そのもの（`npm run editor`） |
 
 色を変えるなら `global.css` 先頭の `--accent` から。
 
 ## 初回だけ必要な設定
 
-1. GitHub で `jiodayo.github.io` という名前のリポジトリを作る（公開/非公開どちらでも可。
-   非公開から Pages を公開するには GitHub Pro 以上が必要）。
-2. ここを push する。
+すでに設定済み。作り直すときの手順として残しておく。
+
+1. GitHub で `blog` という名前のリポジトリを作る。
+2. push する。
 3. リポジトリの **Settings → Pages → Build and deployment → Source** を
    **GitHub Actions** にする。これを忘れると公開されない。
 
-リポジトリ名を `jiodayo.github.io` 以外にした場合は、URL が
-`https://jiodayo.github.io/リポジトリ名/` になるので、`astro.config.mjs` に
-`base: '/リポジトリ名'` を追記する必要がある。`jiodayo.github.io` という名前に
-しておけば `base` は不要。
+### リポジトリ名を変えた場合
+
+URL は `https://jiodayo.github.io/<リポジトリ名>/` になるので、
+`astro.config.mjs` の `base` を同じ名前に書き換える。
+
+サイト内のリンクはすべて `src/lib/url.ts` の `url()` を通しているので、
+`base` を変えれば全部追従する。ベタ書きの `href="/..."` は足さないこと。
 
 ## 独自ドメインに移すとき
 
 独自ドメインは無料アカウントでも使える（GitHub Pro は不要）。
 ドメイン自体はレジストラで取得する。
 
-1. `astro.config.mjs` の `site` を `'https://example.com'` に書き換える。
+1. `astro.config.mjs` の `site` を `'https://example.com'` に書き換え、
+   **`base: '/blog'` の行を削除する**（独自ドメインならサブパスは不要）。
 2. `public/CNAME` を作り、ドメイン名だけを1行書く（`https://` やスラッシュは付けない）。
 
    ```

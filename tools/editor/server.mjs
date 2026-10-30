@@ -29,6 +29,28 @@ const EDITOR_PORT = 4322;
 const DEV_PORT = 4321;
 const DEV_ORIGIN = `http://localhost:${DEV_PORT}`;
 
+// 記事ページのルート名（src/pages/posts/ に対応）
+const POSTS_ROUTE = 'posts';
+
+/**
+ * astro.config.mjs の base を読む。'/blog' のような値か、未設定なら ''。
+ * ここをベタ書きすると base を変えたときにプレビューだけ壊れるため、設定から読む。
+ */
+async function readBase() {
+	try {
+		const conf = await fs.readFile(path.join(ROOT, 'astro.config.mjs'), 'utf8');
+		const m = /^\s*base:\s*['"]([^'"]+)['"]/m.exec(conf);
+		return m ? `/${m[1].replace(/^\/+|\/+$/g, '')}` : '';
+	} catch {
+		return '';
+	}
+}
+
+/** 記事ページのURLのうち、スラッグより前の部分。例: '/blog/posts' */
+async function postUrlPrefix() {
+	return `${await readBase()}/${POSTS_ROUTE}`;
+}
+
 // スラッグはそのままファイル名になるので、ここで厳しく絞る（../ などを防ぐ）
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,80}$/;
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif']);
@@ -369,6 +391,7 @@ async function handleApi(req, res, url) {
 			posts: await listPosts(),
 			git: await gitStatus(),
 			devOrigin: DEV_ORIGIN,
+			postUrlPrefix: await postUrlPrefix(),
 			devUp: await isDevServerUp(),
 			today: today(),
 		});
@@ -380,7 +403,7 @@ async function handleApi(req, res, url) {
 		const slug = searchParams.get('slug') || '';
 		if (!SLUG_RE.test(slug)) return sendJson(res, 200, { ready: false });
 		try {
-			const r = await fetch(`${DEV_ORIGIN}/blog/${slug}/`, {
+			const r = await fetch(`${DEV_ORIGIN}${await postUrlPrefix()}/${slug}/`, {
 				signal: AbortSignal.timeout(2000),
 			});
 			return sendJson(res, 200, { ready: r.ok });

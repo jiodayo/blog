@@ -1,16 +1,17 @@
 ---
 import { SITE_TITLE, SOCIALS } from '../consts';
 import HeaderLink from './HeaderLink.astro';
+import { url } from '../lib/url';
 ---
 
 <header>
 	<nav>
 		<h2>
-			<a href="/">{SITE_TITLE}</a>
+			<a href={url('/')}>{SITE_TITLE}</a>
 		</h2>
 		<div class="internal-links">
 			<HeaderLink href="/">ホーム</HeaderLink>
-			<HeaderLink href="/blog">ブログ</HeaderLink>
+			<HeaderLink href="/posts">ブログ</HeaderLink>
 			<HeaderLink href="/about">About</HeaderLink>
 		</div>
 		<div class="social-links">

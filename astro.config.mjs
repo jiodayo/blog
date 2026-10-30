@@ -13,5 +13,8 @@ import { defineConfig } from 'astro/config';
 // ============================================================
 export default defineConfig({
 	site: 'https://jiodayo.github.io',
+	// リポジトリ名が jiodayo.github.io ではないため、URL に /blog/ が挟まる。
+	// 独自ドメインに移すときは base を消して site だけ書き換える。
+	base: '/blog',
 	integrations: [mdx(), sitemap()],
 });

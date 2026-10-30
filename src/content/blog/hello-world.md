@@ -7,10 +7,13 @@ pubDate: '2026-10-30'
 個人サイトを作った。構成は Astro + GitHub Pages で、`main` に push すると
 GitHub Actions がビルドして自動で公開される。
 
+ルートの `jiodayo.github.io` には別のサイトが動いているので、
+このブログは `blog` リポジトリに置いて `/blog/` の下に生やしている。
+
 ## 記事の書き方
 
 `src/content/blog/` に Markdown ファイルを置くだけ。ファイル名がそのまま URL になる。
-たとえば `hello-world.md` なら `/blog/hello-world/` で読める。
+たとえば `hello-world.md` なら `/blog/posts/hello-world/` で読める。
 
 ファイルの先頭にある `---` で囲まれた部分を frontmatter と呼ぶ。ここは必須。
 
@@ -52,10 +55,23 @@ console.log(greet('世界'));
 
 ## 公開の流れ
 
+普段は編集ツールを使う。
+
+```bash
+npm run editor
+```
+
+左に記事一覧、右に実際の見た目のプレビューが出る。入力は自動保存される。
+「下書き」にチェックを入れている間は公開サイトに出ない。
+書き終えたら「公開する」ボタンを押すだけで、コミットと push までやってくれる。
+
+手で push しても同じ。
+
 ```bash
 git add .
 git commit -m "記事を追加"
 git push
 ```
 
-push から1〜2分で反映される。進行状況はリポジトリの Actions タブで見られる。
+どちらでも、push から1〜2分で反映される。
+進行状況はリポジトリの Actions タブで見られる。

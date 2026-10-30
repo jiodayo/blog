@@ -33,6 +33,7 @@ const el = {
 const state = {
 	posts: [],
 	devOrigin: 'http://localhost:4321',
+	postUrlPrefix: '/posts',
 	current: null, // 開いている記事のスラッグ
 	saveTimer: null,
 	saving: false,
@@ -52,6 +53,7 @@ async function refreshState() {
 	const data = await api('/api/state');
 	state.posts = data.posts;
 	state.devOrigin = data.devOrigin;
+	state.postUrlPrefix = data.postUrlPrefix ?? '/posts';
 	state.today = data.today;
 	// 一覧は中身が変わったときだけ描き直す。
 	// 毎回作り直すと、クリックしようとしている要素が入れ替わってしまう。
@@ -241,7 +243,8 @@ async function updatePreview({ wait = true } = {}) {
 	const slug = state.current;
 	const token = ++previewToken;
 	// 表示用のラベルは本物の dev サーバーのURL、iframe は同一オリジンの中継経由
-	el.previewUrl.textContent = `${state.devOrigin}/blog/${slug}/`;
+	const postPath = `${state.postUrlPrefix}/${slug}/`;
+	el.previewUrl.textContent = `${state.devOrigin}${postPath}`;
 
 	if (wait) {
 		for (let i = 0; i < 20; i++) {
@@ -254,7 +257,7 @@ async function updatePreview({ wait = true } = {}) {
 		}
 	}
 	if (token !== previewToken) return;
-	swapFrame(`/blog/${slug}/?t=${Date.now()}`);
+	swapFrame(`${postPath}?t=${Date.now()}`);
 	el.previewEmpty.hidden = true;
 }
 

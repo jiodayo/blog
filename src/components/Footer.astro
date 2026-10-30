@@ -1,5 +1,6 @@
 ---
 import { AUTHOR, SOCIALS } from '../consts';
+import { url } from '../lib/url';
 
 const today = new Date();
 ---
@@ -7,7 +8,7 @@ const today = new Date();
 <footer>
 	<div class="links">
 		{SOCIALS.map((s) => <a href={s.href} target="_blank" rel="me noopener">{s.label}</a>)}
-		<a href="/rss.xml">RSS</a>
+		<a href={url('/rss.xml')}>RSS</a>
 	</div>
 	<p class="copyright">&copy; {today.getFullYear()} {AUTHOR}</p>
 </footer>

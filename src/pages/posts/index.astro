@@ -5,6 +5,7 @@ import Footer from '../../components/Footer.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import Header from '../../components/Header.astro';
 import { SITE_TITLE } from '../../consts';
+import { url } from '../../lib/url';
 
 const posts = await getPosts();
 ---
@@ -26,7 +27,7 @@ const posts = await getPosts();
 						{posts.map((post) => (
 							<li>
 								<p class="date"><FormattedDate date={post.data.pubDate} /></p>
-								<a class="title" href={`/blog/${post.id}/`}>{post.data.title}</a>
+								<a class="title" href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
 								<p class="desc">{post.data.description}</p>
 							</li>
 						))}
