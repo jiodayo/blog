@@ -39,6 +39,14 @@
 						<span>説明<small>一覧とSNSカードに出る</small></span>
 						<input id="f-description" type="text" placeholder="一行の説明" />
 					</label>
+					<label class="field field-wide">
+						<span>タグ<small>カンマ区切り</small></span>
+						<input id="f-tags" type="text" placeholder="日記, メモ" autocomplete="off" />
+					</label>
+					<div class="field field-wide tag-suggest-row" id="tag-suggest-row" hidden>
+						<span class="tag-suggest-label">使ったことのあるタグ</span>
+						<div class="tag-suggest" id="tag-suggest"></div>
+					</div>
 					<label class="field">
 						<span>公開日</span>
 						<input id="f-pubDate" type="date" />

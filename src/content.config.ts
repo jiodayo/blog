@@ -16,6 +16,8 @@ const blog = defineCollection({
 			heroImage: z.optional(image()),
 			// true の記事は本番ビルドから除外される（dev では見える）
 			draft: z.boolean().default(false),
+			// 記事につけるタグ。書かなければ空配列になる
+			tags: z.array(z.string()).default([]),
 		}),
 });
 

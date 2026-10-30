@@ -246,6 +246,43 @@ body {
 .field-wide input {
 	font-size: 0.95rem;
 }
+/* 既存タグの候補。クリックで付け外しする */
+.tag-suggest-row {
+	flex-direction: row;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: -0.2rem;
+}
+.tag-suggest-label {
+	flex: none;
+	font-weight: 700;
+	opacity: 0.75;
+}
+.tag-suggest {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+}
+.tag-chip {
+	padding: 0.15rem 0.6rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--bg);
+	color: var(--text-dim);
+	font: inherit;
+	font-size: 0.72rem;
+	cursor: pointer;
+}
+.tag-chip:hover {
+	border-color: var(--accent);
+	color: var(--text);
+}
+.tag-chip.on {
+	border-color: var(--accent);
+	background: var(--accent);
+	color: #fff;
+}
+
 .field-check {
 	flex-direction: row;
 	align-items: center;

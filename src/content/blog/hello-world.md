@@ -2,6 +2,7 @@
 title: 'このブログの作り方メモ'
 description: 'Astro と GitHub Pages で個人サイトを立てた。記事の書き方も兼ねたメモ。'
 pubDate: '2026-10-30'
+tags: ['Astro', 'GitHub Pages', 'メモ']
 ---
 
 個人サイトを作った。構成は Astro + GitHub Pages で、`main` に push すると

@@ -43,6 +43,36 @@ main {
 	margin: auto;
 	padding: 3em 1em;
 }
+/* 本文 + 右サイドバーの2段組み。狭い画面ではサイドバーが下に回る。 */
+.layout {
+	display: grid;
+	grid-template-columns: minmax(0, 720px) 220px;
+	gap: 3em;
+	justify-content: center;
+	align-items: start;
+	width: calc(100% - 2em);
+	margin: 0 auto;
+}
+.layout > main {
+	width: auto;
+	max-width: 100%;
+	margin: 0;
+}
+.layout > .sidebar {
+	padding: 3.5em 0 3em 0;
+}
+@media (max-width: 1040px) {
+	.layout {
+		grid-template-columns: minmax(0, 720px);
+	}
+	.layout > .sidebar {
+		padding: 0 1em 3em 1em;
+		border-top: 1px solid rgb(var(--gray-light));
+	}
+	.layout > .sidebar section:first-child {
+		margin-top: 2em;
+	}
+}
 h1,
 h2,
 h3,
@@ -127,6 +157,9 @@ hr {
 	}
 	main {
 		padding: 1em;
+	}
+	.layout {
+		gap: 0;
 	}
 }
 

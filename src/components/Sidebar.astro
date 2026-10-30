@@ -1,0 +1,157 @@
+---
+// 全ページの右側に出す、アーカイブとタグの目次。
+// 記事が増えても手で直す場所が出ないよう、中身は記事から毎回組み立てる。
+import { archiveUrl, collectTags, getPosts, groupByDate, tagUrl } from '../lib/posts';
+import { url } from '../lib/url';
+
+/** 開いているページに対応する項目に印を付けるために使う */
+interface Props {
+	activeArchive?: string;
+	activeTag?: string;
+}
+const { activeArchive, activeTag } = Astro.props;
+
+const posts = await getPosts();
+const years = groupByDate(posts);
+const tags = collectTags(posts);
+---
+
+<aside class="sidebar">
+	<section>
+		<h2><a href={url('/archive/')}>アーカイブ</a></h2>
+		{
+			years.length === 0 ? (
+				<p class="empty">まだ記事がありません</p>
+			) : (
+				<ul class="years">
+					{years.map((year) => (
+						<li>
+							<a
+								class:list={['year', { active: activeArchive === year.key }]}
+								href={archiveUrl(year.key)}
+							>
+								{year.year}年<span class="count">{year.count}</span>
+							</a>
+							<ul class="months">
+								{year.months.map((month) => (
+									<li>
+										<a
+											class:list={[{ active: activeArchive === month.key }]}
+											href={archiveUrl(month.key)}
+										>
+											{month.month}月<span class="count">{month.posts.length}</span>
+										</a>
+									</li>
+								))}
+							</ul>
+						</li>
+					))}
+				</ul>
+			)
+		}
+	</section>
+
+	<section>
+		<h2><a href={url('/tags/')}>タグ</a></h2>
+		{
+			tags.length === 0 ? (
+				<p class="empty">まだタグがありません</p>
+			) : (
+				<ul class="tags">
+					{tags.map(({ tag, count }) => (
+						<li>
+							<a class:list={['tag', { active: activeTag === tag }]} href={tagUrl(tag)}>
+								{tag}
+								<span class="count">{count}</span>
+							</a>
+						</li>
+					))}
+				</ul>
+			)
+		}
+	</section>
+</aside>
+
+<style>
+	.sidebar {
+		font-size: 0.9em;
+		line-height: 1.6;
+	}
+	.sidebar section {
+		margin-bottom: 2.5em;
+	}
+	.sidebar h2 {
+		margin: 0 0 0.6em 0;
+		padding-bottom: 0.4em;
+		border-bottom: 1px solid rgb(var(--gray-light));
+		font-size: 1em;
+		letter-spacing: 0.04em;
+	}
+	.sidebar h2 a {
+		color: rgb(var(--black));
+		text-decoration: none;
+	}
+	.sidebar h2 a:hover {
+		color: var(--accent);
+	}
+	.empty {
+		margin: 0;
+		color: rgb(var(--gray));
+		font-size: 0.95em;
+	}
+	ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.years > li {
+		margin-bottom: 0.8em;
+	}
+	.years a {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5em;
+		padding: 0.15em 0;
+		color: rgb(var(--gray-dark));
+		text-decoration: none;
+	}
+	.years .year {
+		font-weight: 700;
+		color: rgb(var(--black));
+	}
+	.months {
+		margin-left: 0.9em;
+	}
+	.years a:hover,
+	.tags a:hover {
+		color: var(--accent);
+	}
+	.years a.active,
+	.tags a.active {
+		color: var(--accent);
+		font-weight: 700;
+	}
+	.count {
+		color: rgb(var(--gray));
+		font-size: 0.85em;
+		font-variant-numeric: tabular-nums;
+	}
+	.tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4em;
+	}
+	.tags a {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.35em;
+		padding: 0.2em 0.7em;
+		border: 1px solid rgb(var(--gray-light));
+		border-radius: 999px;
+		color: rgb(var(--gray-dark));
+		text-decoration: none;
+	}
+	.tags a.active {
+		border-color: var(--accent);
+	}
+</style>

@@ -5,90 +5,95 @@ import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import TagList from '../components/TagList.astro';
+import { monthKey } from '../lib/posts';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, pubDate, updatedDate, heroImage, draft } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, draft, tags } = Astro.props;
 ---
 
+<!doctype html>
 <html lang="ja">
 	<head>
 		<BaseHead title={title} description={description} />
-		<style>
-			main {
-				width: calc(100% - 2em);
-				max-width: 100%;
-				margin: 0;
-			}
-			.hero-image {
-				width: 100%;
-			}
-			.hero-image img {
-				display: block;
-				margin: 0 auto;
-				border-radius: 12px;
-				box-shadow: var(--box-shadow);
-			}
-			.prose {
-				width: 720px;
-				max-width: calc(100% - 2em);
-				margin: auto;
-				padding: 1em;
-				color: rgb(var(--gray-dark));
-			}
-			.title {
-				margin-bottom: 1em;
-				padding: 1em 0;
-				text-align: center;
-				line-height: 1;
-			}
-			.title h1 {
-				margin: 0 0 0.5em 0;
-			}
-			.date {
-				margin-bottom: 0.5em;
-				color: rgb(var(--gray));
-			}
-			.draft-badge {
-				display: inline-block;
-				margin: 0 0 1em 0;
-				padding: 0.2em 0.8em;
-				border-radius: 999px;
-				background: #fff3cd;
-				color: #7a5c00;
-				font-size: 0.75em;
-			}
-			.last-updated-on {
-				font-style: italic;
-			}
-		</style>
 	</head>
 
 	<body>
 		<Header />
-		<main>
-			<article>
-				<div class="hero-image">
-					{heroImage && <Image width={1020} height={510} src={heroImage} alt="" />}
-				</div>
-				<div class="prose">
-					<div class="title">
+		<div class="layout">
+			<main>
+				<article>
+					{
+						heroImage && (
+							<div class="hero-image">
+								<Image width={1020} height={510} src={heroImage} alt="" />
+							</div>
+						)
+					}
+					<header class="title">
 						{draft && <p class="draft-badge">下書き（公開サイトには出ません）</p>}
-					<div class="date">
+						<div class="date">
 							<FormattedDate date={pubDate} />
-							{updatedDate && (
-								<div class="last-updated-on">
-									最終更新: <FormattedDate date={updatedDate} />
-								</div>
-							)}
+							{
+								updatedDate && (
+									<span class="last-updated-on">
+										（最終更新: <FormattedDate date={updatedDate} />）
+									</span>
+								)
+							}
 						</div>
 						<h1>{title}</h1>
+						<TagList tags={tags} class="post-tags" />
 						<hr />
+					</header>
+					<div class="prose">
+						<slot />
 					</div>
-					<slot />
-				</div>
-			</article>
-		</main>
+				</article>
+			</main>
+			<Sidebar activeArchive={monthKey(pubDate)} />
+		</div>
 		<Footer />
 	</body>
 </html>
+
+<style>
+	.hero-image img {
+		display: block;
+		width: 100%;
+		height: auto;
+		margin: 0 0 2em 0;
+		border-radius: 12px;
+		box-shadow: var(--box-shadow);
+	}
+	.title {
+		margin-bottom: 1.5em;
+	}
+	.title h1 {
+		margin: 0.2em 0 0 0;
+	}
+	.title hr {
+		margin-top: 1.5em;
+	}
+	.date {
+		color: rgb(var(--gray));
+		font-size: 0.9em;
+	}
+	.last-updated-on {
+		font-style: italic;
+	}
+	.draft-badge {
+		display: inline-block;
+		margin: 0 0 0.5em 0;
+		padding: 0.2em 0.8em;
+		border-radius: 999px;
+		background: #fff3cd;
+		color: #7a5c00;
+		font-size: 0.75em;
+	}
+	.prose {
+		color: rgb(var(--gray-dark));
+	}
+</style>

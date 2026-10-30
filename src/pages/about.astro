@@ -1,38 +1,26 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Footer from '../components/Footer.astro';
-import Header from '../components/Header.astro';
+import Page from '../layouts/Page.astro';
 import { SITE_TITLE, SOCIALS } from '../consts';
 ---
 
-<!doctype html>
-<html lang="ja">
-	<head>
-		<BaseHead title={`About | ${SITE_TITLE}`} description="自己紹介と連絡先。" />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>About</h1>
+<Page title={`About | ${SITE_TITLE}`} description="自己紹介と連絡先。">
+	<h1>About</h1>
 
-			<!-- ここから下を自分の内容に書き換える -->
-			<p>
-				jiodayo です。ここに自己紹介を書きます。何をしている人なのか、何に興味があるのか、
-				2〜3行あれば十分です。
-			</p>
+	<!-- ここから下を自分の内容に書き換える -->
+	<p>
+		jiodayo です。ここに自己紹介を書きます。何をしている人なのか、何に興味があるのか、
+		2〜3行あれば十分です。
+	</p>
 
-			<h2>やっていること</h2>
-			<ul>
-				<li>項目1</li>
-				<li>項目2</li>
-			</ul>
+	<h2>やっていること</h2>
+	<ul>
+		<li>項目1</li>
+		<li>項目2</li>
+	</ul>
 
-			<h2>リンク</h2>
-			<ul>
-				{SOCIALS.map((s) => <li><a href={s.href} target="_blank" rel="me noopener">{s.label}</a></li>)}
-			</ul>
-			<!-- ここまで -->
-		</main>
-		<Footer />
-	</body>
-</html>
+	<h2>リンク</h2>
+	<ul>
+		{SOCIALS.map((s) => <li><a href={s.href} target="_blank" rel="me noopener">{s.label}</a></li>)}
+	</ul>
+	<!-- ここまで -->
+</Page>

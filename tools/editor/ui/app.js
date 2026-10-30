@@ -11,6 +11,9 @@ const el = {
 	editor: $('editor'),
 	title: $('f-title'),
 	description: $('f-description'),
+	tags: $('f-tags'),
+	tagSuggest: $('tag-suggest'),
+	tagSuggestRow: $('tag-suggest-row'),
 	pubDate: $('f-pubDate'),
 	updatedDate: $('f-updatedDate'),
 	slug: $('f-slug'),
@@ -62,6 +65,7 @@ async function refreshState() {
 	if (signature !== state.listSignature) {
 		state.listSignature = signature;
 		renderList();
+		if (state.current) renderTagSuggestions();
 	}
 	renderGit(data.git, data.devUp);
 	return data;
@@ -108,10 +112,61 @@ function setSaveState(text, cls = '') {
 
 // --------------------------------------------------------------- 記事の操作
 
+/** 入力欄の文字列をタグの配列にする。カンマは半角・全角・読点のどれでもよい。 */
+function parseTags(value) {
+	const seen = new Set();
+	const out = [];
+	for (const raw of String(value).split(/[,、，]/)) {
+		const tag = raw.trim();
+		if (!tag || seen.has(tag)) continue;
+		seen.add(tag);
+		out.push(tag);
+	}
+	return out;
+}
+
+/** いま入力欄に入っているタグ */
+function currentTags() {
+	return parseTags(el.tags.value);
+}
+
+function setTags(list) {
+	el.tags.value = list.join(', ');
+}
+
+/**
+ * 他の記事で使ったタグを下に並べる。綴りが揺れると別タグになってしまうので、
+ * 打ち直さずに選べるようにしておく。
+ */
+function renderTagSuggestions() {
+	const all = new Set();
+	for (const post of state.posts) for (const tag of post.tags || []) all.add(tag);
+	const active = new Set(currentTags());
+	const list = [...all].sort((a, b) => a.localeCompare(b, 'ja'));
+	el.tagSuggestRow.hidden = list.length === 0;
+	el.tagSuggest.innerHTML = list
+		.map(
+			(tag) =>
+				`<button type="button" class="tag-chip${active.has(tag) ? ' on' : ''}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`,
+		)
+		.join('');
+}
+
+function toggleTag(tag) {
+	const list = currentTags();
+	const i = list.indexOf(tag);
+	if (i === -1) list.push(tag);
+	else list.splice(i, 1);
+	setTags(list);
+	renderTagSuggestions();
+	scheduleSave();
+}
+
 function formValues() {
 	return {
 		title: el.title.value,
 		description: el.description.value,
+		tags: currentTags(),
 		pubDate: el.pubDate.value,
 		updatedDate: el.updatedDate.value,
 		draft: el.draft.checked,
@@ -125,12 +180,14 @@ async function openPost(slug) {
 	state.current = slug;
 	el.title.value = post.title;
 	el.description.value = post.description;
+	setTags(post.tags || []);
 	el.pubDate.value = post.pubDate;
 	el.updatedDate.value = post.updatedDate;
 	el.slug.value = post.slug;
 	el.draft.checked = post.draft;
 	el.body.value = post.body;
 	el.editor.hidden = false;
+	renderTagSuggestions();
 	state.listSignature = JSON.stringify([state.posts, state.current]);
 	renderList();
 	setSaveState('保存済み', 'ok');
@@ -209,6 +266,7 @@ async function createPost() {
 		body: JSON.stringify({
 			title: '無題の記事',
 			description: '',
+			tags: [],
 			pubDate: state.today,
 			draft: true,
 			body: '',
@@ -491,11 +549,16 @@ el.list.addEventListener('click', (e) => {
 	if (li) openPost(li.dataset.slug).catch((err) => alert(err.message));
 });
 
-for (const node of [el.title, el.description, el.pubDate, el.updatedDate, el.draft, el.body]) {
+for (const node of [el.title, el.description, el.tags, el.pubDate, el.updatedDate, el.draft, el.body]) {
 	node.addEventListener('input', scheduleSave);
 	node.addEventListener('change', scheduleSave);
 }
 el.slug.addEventListener('change', applySlugChange);
+el.tags.addEventListener('input', renderTagSuggestions);
+el.tagSuggest.addEventListener('click', (e) => {
+	const btn = e.target.closest('button[data-tag]');
+	if (btn) toggleTag(btn.dataset.tag);
+});
 
 el.newPost.addEventListener('click', () => createPost().catch((e) => alert(e.message)));
 el.delete.addEventListener('click', () => deletePost().catch((e) => alert(e.message)));

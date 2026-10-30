@@ -1,0 +1,109 @@
+---
+// 年月のアーカイブ。1ファイルで3種類のページを作る。
+//   /archive/         すべての記事を年→月で並べる
+//   /archive/2026/    その年
+//   /archive/2026/10/ その月
+import Page from '../../layouts/Page.astro';
+import PostList from '../../components/PostList.astro';
+import { SITE_TITLE } from '../../consts';
+import { archiveUrl, getPosts, groupByDate, monthKey, yearKey } from '../../lib/posts';
+
+export async function getStaticPaths() {
+	const years = groupByDate(await getPosts());
+	// date: undefined がアーカイブのトップになる
+	const paths: { params: { date?: string } }[] = [{ params: { date: undefined } }];
+	for (const year of years) {
+		paths.push({ params: { date: year.key } });
+		for (const month of year.months) paths.push({ params: { date: month.key } });
+	}
+	return paths;
+}
+
+const key = Astro.params.date ?? '';
+const isYear = /^\d{4}$/.test(key);
+
+const all = await getPosts();
+const posts = key
+	? all.filter((post) =>
+			isYear ? yearKey(post.data.pubDate) === key : monthKey(post.data.pubDate) === key,
+		)
+	: all;
+const years = groupByDate(posts);
+
+const heading = key
+	? isYear
+		? `${key}年の記事`
+		: `${key.slice(0, 4)}年${Number(key.slice(5))}月の記事`
+	: 'アーカイブ';
+---
+
+<Page
+	title={`${heading} | ${SITE_TITLE}`}
+	description={`${heading}の一覧。`}
+	activeArchive={key || undefined}
+>
+	<h1>{heading}</h1>
+	<p class="count">{posts.length}件</p>
+
+	{
+		posts.length === 0 ? (
+			<p>記事がありません。</p>
+		) : (
+			years.map((year) => (
+				<section class="year">
+					{!key && (
+						<h2>
+							<a href={archiveUrl(year.key)}>{year.year}年</a>
+							<span class="n">{year.count}件</span>
+						</h2>
+					)}
+					{year.months.map((month) => (
+						<section class="month">
+							{!(key && !isYear) && (
+								<h3>
+									<a href={archiveUrl(month.key)}>{month.month}月</a>
+									<span class="n">{month.posts.length}件</span>
+								</h3>
+							)}
+							<PostList posts={month.posts} />
+						</section>
+					))}
+				</section>
+			))
+		)
+	}
+</Page>
+
+<style>
+	.count {
+		margin-top: -0.5em;
+		color: rgb(var(--gray));
+		font-size: 0.9em;
+	}
+	.year {
+		margin-bottom: 2.5em;
+	}
+	.month {
+		margin-bottom: 1.5em;
+	}
+	h2,
+	h3 {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6em;
+	}
+	h2 a,
+	h3 a {
+		text-decoration: none;
+		color: inherit;
+	}
+	h2 a:hover,
+	h3 a:hover {
+		color: var(--accent);
+	}
+	.n {
+		color: rgb(var(--gray));
+		font-size: 0.6em;
+		font-weight: 400;
+	}
+</style>

@@ -64,10 +64,45 @@ class HttpError extends Error {
 
 // ---------------------------------------------------------------- frontmatter
 
+/** '[a, b]' を配列に分ける。引用符の中のカンマは区切りにしない。 */
+function parseFlowSeq(raw) {
+	const inner = raw.trim().slice(1, -1);
+	const items = [];
+	let buf = '';
+	let quote = '';
+	for (let i = 0; i < inner.length; i++) {
+		const ch = inner[i];
+		if (quote) {
+			// 引用符の中。'' と \" は文字そのものとして扱う
+			if (ch === quote && inner[i + 1] === quote) {
+				buf += ch;
+				i++;
+			} else if (ch === '\\' && quote === '"' && inner[i + 1] === '"') {
+				buf += '"';
+				i++;
+			} else if (ch === quote) {
+				quote = '';
+			} else {
+				buf += ch;
+			}
+		} else if (ch === "'" || ch === '"') {
+			quote = ch;
+		} else if (ch === ',') {
+			items.push(buf.trim());
+			buf = '';
+		} else {
+			buf += ch;
+		}
+	}
+	items.push(buf.trim());
+	return items.filter((v) => v !== '');
+}
+
 function parseScalar(raw) {
 	const v = raw.trim();
 	if (v === 'true') return true;
 	if (v === 'false') return false;
+	if (v.startsWith('[') && v.endsWith(']')) return parseFlowSeq(v);
 	if (v.length >= 2 && v.startsWith("'") && v.endsWith("'")) {
 		return v.slice(1, -1).replace(/''/g, "'");
 	}
@@ -88,6 +123,20 @@ function parsePost(raw) {
 	return { data, body: m[2] };
 }
 
+/** 画面から来た tags を整える。空文字と重複を落とし、順番は保つ。 */
+function normalizeTags(value) {
+	const list = Array.isArray(value) ? value : [];
+	const seen = new Set();
+	const out = [];
+	for (const raw of list) {
+		const tag = String(raw).trim();
+		if (!tag || seen.has(tag)) continue;
+		seen.add(tag);
+		out.push(tag);
+	}
+	return out;
+}
+
 // YAML の単一引用符は '' でエスケープする
 function yamlString(value) {
 	return `'${String(value ?? '').replace(/'/g, "''")}'`;
@@ -100,6 +149,8 @@ function serializePost(data, body) {
 		`pubDate: ${yamlString(data.pubDate)}`,
 	];
 	if (data.updatedDate) lines.push(`updatedDate: ${yamlString(data.updatedDate)}`);
+	const tags = normalizeTags(data.tags);
+	if (tags.length > 0) lines.push(`tags: [${tags.map(yamlString).join(', ')}]`);
 	if (data.draft) lines.push('draft: true');
 	return `---\n${lines.join('\n')}\n---\n\n${body.replace(/^\s+|\s+$/g, '')}\n`;
 }
@@ -133,6 +184,7 @@ async function listPosts() {
 			title: data.title || slug,
 			description: data.description || '',
 			pubDate: data.pubDate || '',
+			tags: normalizeTags(data.tags),
 			draft: data.draft === true,
 			// .mdx は一覧には出すが、このエディタでは開かない
 			readOnly: name.endsWith('.mdx'),
@@ -156,6 +208,7 @@ async function readPost(slug) {
 		description: data.description || '',
 		pubDate: data.pubDate || today(),
 		updatedDate: data.updatedDate || '',
+		tags: normalizeTags(data.tags),
 		draft: data.draft === true,
 		body,
 	};

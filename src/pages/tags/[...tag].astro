@@ -1,0 +1,86 @@
+---
+// タグのページ。/tags/ がタグ一覧、/tags/<タグ>/ がそのタグの記事。
+import Page from '../../layouts/Page.astro';
+import PostList from '../../components/PostList.astro';
+import { SITE_TITLE } from '../../consts';
+import { collectTags, getPosts, tagUrl } from '../../lib/posts';
+
+export async function getStaticPaths() {
+	const tags = collectTags(await getPosts());
+	return [
+		{ params: { tag: undefined } },
+		...tags.map(({ tag }) => ({ params: { tag } })),
+	];
+}
+
+const tag = Astro.params.tag;
+const all = await getPosts();
+const posts = tag ? all.filter((post) => post.data.tags.includes(tag)) : [];
+const tags = collectTags(all);
+
+const heading = tag ? `#${tag}` : 'タグ';
+---
+
+<Page
+	title={`${heading} | ${SITE_TITLE}`}
+	description={tag ? `${tag} の記事一覧。` : '使っているタグの一覧。'}
+	activeTag={tag}
+>
+	<h1>{heading}</h1>
+
+	{
+		tag ? (
+			<>
+				<p class="count">{posts.length}件</p>
+				<PostList posts={posts} />
+			</>
+		) : tags.length === 0 ? (
+			<p>まだタグが付いた記事がありません。</p>
+		) : (
+			<ul class="all-tags">
+				{tags.map((t) => (
+					<li>
+						<a href={tagUrl(t.tag)}>
+							#{t.tag}
+							<span class="n">{t.count}</span>
+						</a>
+					</li>
+				))}
+			</ul>
+		)
+	}
+</Page>
+
+<style>
+	.count {
+		margin-top: -0.5em;
+		color: rgb(var(--gray));
+		font-size: 0.9em;
+	}
+	.all-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6em;
+		list-style: none;
+		margin: 1.5em 0 0 0;
+		padding: 0;
+	}
+	.all-tags a {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.4em;
+		padding: 0.35em 0.9em;
+		border: 1px solid rgb(var(--gray-light));
+		border-radius: 999px;
+		color: rgb(var(--gray-dark));
+		text-decoration: none;
+	}
+	.all-tags a:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.n {
+		color: rgb(var(--gray));
+		font-size: 0.85em;
+	}
+</style>

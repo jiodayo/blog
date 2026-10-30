@@ -1,0 +1,67 @@
+---
+// 記事一覧の見た目。トップ・ブログ・アーカイブ・タグの各ページで共通に使う。
+import type { Post } from '../lib/posts';
+import FormattedDate from './FormattedDate.astro';
+import TagList from './TagList.astro';
+import { url } from '../lib/url';
+
+interface Props {
+	posts: Post[];
+}
+const { posts } = Astro.props;
+---
+
+<ul class="post-list">
+	{
+		posts.map((post) => (
+			<li>
+				<p class="date">
+					<FormattedDate date={post.data.pubDate} />
+					{post.data.draft && <span class="draft">下書き</span>}
+				</p>
+				<a class="title" href={url(`/posts/${post.id}/`)}>
+					{post.data.title}
+				</a>
+				{post.data.description && <p class="desc">{post.data.description}</p>}
+				<TagList tags={post.data.tags} />
+			</li>
+		))
+	}
+</ul>
+
+<style>
+	.post-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.post-list li {
+		padding: 1.25em 0;
+		border-bottom: 1px solid rgb(var(--gray-light));
+	}
+	.date {
+		margin: 0 0 0.2em 0;
+		color: rgb(var(--gray));
+		font-size: 0.85em;
+	}
+	.draft {
+		margin-left: 0.6em;
+		padding: 0.1em 0.6em;
+		border-radius: 999px;
+		background: #fff3cd;
+		color: #7a5c00;
+	}
+	.title {
+		font-size: 1.15em;
+		font-weight: 700;
+		text-decoration: none;
+	}
+	.title:hover {
+		text-decoration: underline;
+	}
+	.desc {
+		margin: 0.3em 0 0 0;
+		color: rgb(var(--gray));
+		font-size: 0.9em;
+	}
+</style>
