@@ -163,6 +163,56 @@ hr {
 	}
 }
 
+/* 脚注（[^1] で書くと本文の下にまとまる）。
+   見出しは読み上げ用に隠される仕様なので、ここで表に出している。 */
+.footnotes {
+	margin-top: 3.5em;
+	padding-top: 1.5em;
+	border-top: 1px solid rgb(var(--gray-light));
+	font-size: 0.88em;
+	color: rgb(var(--gray));
+}
+.footnotes h2.sr-only {
+	position: static !important;
+	width: auto;
+	height: auto;
+	margin: 0 0 0.6em 0;
+	overflow: visible;
+	clip: auto;
+	clip-path: none;
+	white-space: normal;
+	font-size: 1.1em;
+	color: rgb(var(--gray-dark));
+}
+.footnotes ol {
+	margin: 0;
+	padding-left: 1.4em;
+}
+.footnotes li {
+	margin-bottom: 0.5em;
+	padding: 0.1em 0.3em;
+	border-radius: 4px;
+}
+.footnotes li p {
+	margin: 0;
+}
+/* 本文の番号から飛んできた項目を少しだけ目立たせる */
+.footnotes li:target {
+	background: #fff3cd;
+}
+.data-footnote-backref {
+	margin-left: 0.4em;
+	text-decoration: none;
+}
+/* 本文中の番号 */
+sup a {
+	text-decoration: none;
+	padding: 0 0.15em;
+}
+sup a:hover {
+	text-decoration: underline;
+}
+
 .sr-only {
 	border: 0;
 	padding: 0;
