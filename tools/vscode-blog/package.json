@@ -1,0 +1,60 @@
+{
+	"name": "jiodayo-blog",
+	"displayName": "ブログ",
+	"description": "このブログ用のコマンド。新しい記事・公開・画像の自動縮小・プレビュー。",
+	"version": "0.1.0",
+	"publisher": "jiodayo",
+	"private": true,
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.140.0"
+	},
+	"main": "./extension.js",
+	"categories": ["Other"],
+	"activationEvents": ["workspaceContains:src/content/blog"],
+	"contributes": {
+		"commands": [
+			{ "command": "blog.newPost", "title": "新しい記事", "category": "ブログ", "icon": "$(add)" },
+			{ "command": "blog.publish", "title": "公開する", "category": "ブログ", "icon": "$(cloud-upload)" },
+			{ "command": "blog.insertImage", "title": "画像を挿入", "category": "ブログ", "icon": "$(device-camera)" },
+			{ "command": "blog.preview", "title": "プレビューを開く", "category": "ブログ", "icon": "$(preview)" },
+			{ "command": "blog.toggleDraft", "title": "下書きを切り替える", "category": "ブログ" }
+		],
+		"menus": {
+			"editor/title": [
+				{
+					"command": "blog.preview",
+					"when": "blog.isBlogWorkspace && resourceExtname == .md",
+					"group": "navigation@1"
+				},
+				{
+					"command": "blog.insertImage",
+					"when": "blog.isBlogWorkspace && resourceExtname == .md",
+					"group": "navigation@2"
+				}
+			],
+			"commandPalette": [
+				{ "command": "blog.newPost", "when": "blog.isBlogWorkspace" },
+				{ "command": "blog.publish", "when": "blog.isBlogWorkspace" },
+				{ "command": "blog.insertImage", "when": "blog.isBlogWorkspace" },
+				{ "command": "blog.preview", "when": "blog.isBlogWorkspace" },
+				{ "command": "blog.toggleDraft", "when": "blog.isBlogWorkspace" }
+			]
+		},
+		"configuration": {
+			"title": "ブログ",
+			"properties": {
+				"blog.maxImageWidth": {
+					"type": "number",
+					"default": 1600,
+					"description": "貼り付けた画像をこの幅まで縮小する（px）。0 で縮小しない。"
+				},
+				"blog.devServerUrl": {
+					"type": "string",
+					"default": "http://localhost:4321",
+					"description": "プレビューに使う Astro dev サーバーの URL。"
+				}
+			}
+		}
+	}
+}

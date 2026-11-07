@@ -1,0 +1,12 @@
+{
+	// 画像の貼り付け／ドロップは拡張（tools/vscode-blog）が受け取る。
+	// VS Code 標準のほうは縮小せずにコピーするだけなので、こちらを止めておく。
+	"markdown.editor.filePaste.enabled": "never",
+	"markdown.editor.drop.enabled": "never",
+
+	// frontmatter の都合で、記事は末尾に改行を入れておきたい
+	"[markdown]": {
+		"files.insertFinalNewline": true,
+		"files.trimTrailingWhitespace": false
+	}
+}

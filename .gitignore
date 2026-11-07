@@ -25,3 +25,6 @@ pnpm-debug.log*
 
 # Claude Code のローカル設定
 .claude/
+
+# VS Code 拡張のパッケージ（install.sh が作って消す）
+*.vsix

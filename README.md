@@ -49,6 +49,35 @@ npm run editor
 
 エディタはこのMacの中だけで動く（127.0.0.1 にしかバインドしない）。
 
+## VS Code で書く
+
+`tools/vscode-blog/` に、このブログ用の VS Code 拡張を置いてある。
+Web のエディタの代わりに VS Code で書きたいときはこちら。
+
+```bash
+tools/vscode-blog/install.sh
+```
+
+入れたあと、VS Code で `⇧⌘P` → `Developer: Reload Window`。
+コマンドパレットで「ブログ」と打つと次が出る。
+
+| コマンド | 内容 |
+| --- | --- |
+| ブログ: 新しい記事 | スラッグと frontmatter を作って開く |
+| ブログ: 公開する | 保存 → `git add -A` → commit → push |
+| ブログ: プレビューを開く | dev サーバーを起動して、その記事を横に表示 |
+| ブログ: 画像を挿入 | ファイルを選んで挿入 |
+| ブログ: 下書きを切り替える | `draft: true` の付け外し |
+
+画像は**貼り付け／ドロップ**でも入る。Web のエディタと同じく 1600px に縮小される
+（こちらは macOS 標準の `sips` を使う）。`tags:` の行ではタグが補完される。
+右下に未公開の変更の件数が出て、クリックで公開できる。
+
+拡張を直したときは `install.sh` を実行し直すこと。
+
+**Web のエディタと同時に同じ記事を開かないこと。** あちらは自動保存するので、
+VS Code 側で書いた内容を上書きすることがある。どちらかに寄せて使う。
+
 ### 記事を直接書く場合
 
 
@@ -101,7 +130,9 @@ tags: ['日記', 'メモ']
 | `src/lib/posts.ts` | 記事の取得・年月のまとめ・タグの集計 |
 | `astro.config.mjs` | 公開URL（`site`）とサブパス（`base`） |
 | `src/lib/url.ts` | サイト内リンクに `base` を付けるヘルパー |
-| `tools/editor/` | 編集画面そのもの（`npm run editor`） |
+| `tools/editor/` | Web の編集画面（`npm run editor`） |
+| `tools/vscode-blog/` | VS Code 拡張 |
+| `.vscode/settings.json` | 画像の貼り付けを拡張側に任せる設定 |
 
 色を変えるなら `global.css` 先頭の `--accent` から。
 
