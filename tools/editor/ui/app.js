@@ -342,15 +342,37 @@ function reloadPreview() {
 
 // ----------------------------------------------------------- Markdown 補助
 
+/**
+ * 本文の一部を書き換える。
+ *
+ * ta.value に直接代入するとブラウザが持っている取り消し履歴が消えてしまい、
+ * ツールバーを一度でも使うと ⌘Z が効かなくなる。execCommand は非推奨だが、
+ * 「人が打ったのと同じ扱いで差し替える」手段は今のところこれしかない。
+ */
+function replaceRange(start, end, text) {
+	const ta = el.body;
+	ta.focus();
+	ta.setSelectionRange(start, end);
+	let ok = false;
+	try {
+		ok = document.execCommand('insertText', false, text);
+	} catch {
+		ok = false;
+	}
+	if (!ok) {
+		// 使えない環境向けの保険。この経路だけは ⌘Z が効かない。
+		ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+		ta.selectionStart = ta.selectionEnd = start + text.length;
+	}
+	scheduleSave();
+}
+
 function surround(before, after = before) {
 	const ta = el.body;
 	const { selectionStart: s, selectionEnd: e, value } = ta;
 	const sel = value.slice(s, e);
-	ta.value = value.slice(0, s) + before + sel + after + value.slice(e);
-	ta.selectionStart = s + before.length;
-	ta.selectionEnd = s + before.length + sel.length;
-	ta.focus();
-	scheduleSave();
+	replaceRange(s, e, before + sel + after);
+	ta.setSelectionRange(s + before.length, s + before.length + sel.length);
 }
 
 function prefixLines(prefix) {
@@ -364,20 +386,13 @@ function prefixLines(prefix) {
 		.split('\n')
 		.map((line, i) => (numbered ? `${i + 1}. ` : prefix) + line.replace(/^([#>-]+ |\d+\. )/, ''))
 		.join('\n');
-	ta.value = value.slice(0, start) + next + value.slice(end);
-	ta.selectionStart = start;
-	ta.selectionEnd = start + next.length;
-	ta.focus();
-	scheduleSave();
+	replaceRange(start, end, next);
+	ta.setSelectionRange(start, start + next.length);
 }
 
 function insertAtCursor(text) {
 	const ta = el.body;
-	const { selectionStart: s, selectionEnd: e, value } = ta;
-	ta.value = value.slice(0, s) + text + value.slice(e);
-	ta.selectionStart = ta.selectionEnd = s + text.length;
-	ta.focus();
-	scheduleSave();
+	replaceRange(ta.selectionStart, ta.selectionEnd, text);
 }
 
 const MD_ACTIONS = {
