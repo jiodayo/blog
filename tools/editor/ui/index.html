@@ -12,8 +12,11 @@
 			<div class="topbar-status">
 				<span id="save-state" class="pill">—</span>
 				<span id="git-state" class="pill" title="未コミットの変更"></span>
+				<span id="deploy-state" class="pill" hidden></span>
 			</div>
 			<div class="topbar-actions">
+				<button id="btn-site" class="btn btn-small" title="サイト名・説明・見出し画像">サイト設定</button>
+				<button id="btn-images" class="btn btn-small" title="画像の整理">画像</button>
 				<button id="btn-publish" class="btn btn-primary">公開する</button>
 			</div>
 		</header>
@@ -25,7 +28,10 @@
 					<span>記事</span>
 					<button id="btn-new" class="btn btn-small">+ 新規</button>
 				</div>
+				<input id="post-search" class="post-search" type="search" placeholder="記事を探す" autocomplete="off" />
 				<ul id="post-list" class="post-list"></ul>
+				<div class="sidebar-head sidebar-head-sub">ページ</div>
+				<ul id="page-list" class="post-list"></ul>
 			</aside>
 
 			<!-- 編集 -->
@@ -63,6 +69,15 @@
 						<input id="f-draft" type="checkbox" />
 						<span>下書き<small>公開サイトに出さない</small></span>
 					</label>
+					<div class="field field-wide hero-row">
+						<span>ヘッダ画像<small>記事の先頭に大きく出る</small></span>
+						<div class="hero-controls">
+							<button id="btn-hero" class="btn btn-small">画像を選ぶ</button>
+							<button id="btn-hero-clear" class="btn btn-small" hidden>外す</button>
+							<img id="hero-thumb" class="hero-thumb" alt="" hidden />
+							<span id="hero-name" class="hero-name"></span>
+						</div>
+					</div>
 				</div>
 
 				<div class="toolbar" id="toolbar">
@@ -77,6 +92,11 @@
 					<button data-md="ol" title="番号付き">1.</button>
 					<span class="toolbar-sep"></span>
 					<button id="btn-image" title="画像を追加">🖼 画像</button>
+					<button id="btn-embed" title="URL を埋め込む (⌘⇧K)">🔗 埋め込み</button>
+					<span class="menu-wrap">
+						<button id="btn-template" title="よく使う書き方を挿入">⊞ テンプレート</button>
+						<div id="template-menu" class="menu" hidden></div>
+					</span>
 					<span class="toolbar-hint" id="toolbar-hint">画像はエディタに貼り付け／ドロップでも入ります</span>
 					<span class="toolbar-grow"></span>
 					<button id="btn-delete" class="danger" title="この記事を削除">削除</button>
@@ -88,6 +108,12 @@
 					spellcheck="false"
 					placeholder="ここに本文を Markdown で書きます。&#10;&#10;見出しは ## から。**太字**、`コード`、[リンク](https://example.com) が使えます。"
 				></textarea>
+				<div class="statusline">
+					<span id="count-chars">0 文字</span>
+					<span id="count-lines">0 行</span>
+					<span class="toolbar-grow"></span>
+					<a id="live-link" class="live-link" target="_blank" rel="noopener" hidden>公開中のページを開く ↗</a>
+				</div>
 			</section>
 
 			<!-- プレビュー -->
@@ -116,11 +142,14 @@
 			<div class="modal-box">
 				<h2 id="modal-title">公開</h2>
 				<pre id="modal-log"></pre>
+				<div id="modal-form" class="modal-form" hidden></div>
 				<div class="modal-actions" id="modal-actions"></div>
 			</div>
 		</div>
 
 		<input id="file-input" type="file" accept="image/*" hidden />
+		<input id="hero-input" type="file" accept="image/*" hidden />
+		<input id="banner-input" type="file" accept="image/*" hidden />
 		<script type="module" src="/__editor/app.js"></script>
 	</body>
 </html>

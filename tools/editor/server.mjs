@@ -23,6 +23,12 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
 const POSTS_DIR = path.join(ROOT, 'src/content/blog');
 const IMAGES_DIR = path.join(POSTS_DIR, 'images');
+const PAGES_DIR = path.join(ROOT, 'src/content/pages');
+const SITE_FILE = path.join(ROOT, 'src/site.json');
+const PUBLIC_DIR = path.join(ROOT, 'public');
+// 生の HTML の中の <img> は Astro が面倒を見ないので、
+// 記事からの相対パスだと 404 になる。public/ に置いて絶対パスで参照する。
+const EMBED_DIR = path.join(PUBLIC_DIR, 'embeds');
 const UI_DIR = path.join(HERE, 'ui');
 
 const EDITOR_PORT = 4322;
@@ -41,6 +47,17 @@ async function readBase() {
 		const conf = await fs.readFile(path.join(ROOT, 'astro.config.mjs'), 'utf8');
 		const m = /^\s*base:\s*['"]([^'"]+)['"]/m.exec(conf);
 		return m ? `/${m[1].replace(/^\/+|\/+$/g, '')}` : '';
+	} catch {
+		return '';
+	}
+}
+
+/** astro.config.mjs の site。公開後のURLを画面に出すために使う */
+async function readSiteUrl() {
+	try {
+		const conf = await fs.readFile(path.join(ROOT, 'astro.config.mjs'), 'utf8');
+		const m = /^\s*site:\s*['"]([^'"]+)['"]/m.exec(conf);
+		return m ? m[1].replace(/\/+$/, '') : '';
 	} catch {
 		return '';
 	}
@@ -149,6 +166,7 @@ function serializePost(data, body) {
 		`pubDate: ${yamlString(data.pubDate)}`,
 	];
 	if (data.updatedDate) lines.push(`updatedDate: ${yamlString(data.updatedDate)}`);
+	if (data.heroImage) lines.push(`heroImage: ${yamlString(data.heroImage)}`);
 	const tags = normalizeTags(data.tags);
 	if (tags.length > 0) lines.push(`tags: [${tags.map(yamlString).join(', ')}]`);
 	if (data.draft) lines.push('draft: true');
@@ -208,6 +226,7 @@ async function readPost(slug) {
 		description: data.description || '',
 		pubDate: data.pubDate || today(),
 		updatedDate: data.updatedDate || '',
+		heroImage: data.heroImage || '',
 		tags: normalizeTags(data.tags),
 		draft: data.draft === true,
 		body,
@@ -299,6 +318,439 @@ async function saveImage(slug, ext, buffer) {
 		widthBefore: shrunk.widthBefore ?? null,
 		width: shrunk.width ?? null,
 	};
+}
+
+// ------------------------------------------------------------------- 埋め込み
+//
+// 貼った URL を、記事の中で見られる形に変える。
+// 外部のスクリプトは一切読み込まない方針なので、
+//   YouTube → 公式の埋め込み iframe（Cookie を置かない nocookie 版）
+//   X       → 本文つきの引用（widgets.js は読み込まない）
+//   その他   → OGP を読んでリンクカード。画像は手元に落として縮小する
+// のいずれかの HTML をここで組み立てて返す。
+
+const FETCH_TIMEOUT = 10000;
+const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_EMBED_IMAGE_BYTES = 8 * 1024 * 1024;
+const UA = 'Mozilla/5.0 (compatible; blog-editor/1.0)';
+
+const escapeHtml = (v) =>
+	String(v ?? '').replace(
+		/[&<>"']/g,
+		(c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+	);
+
+/**
+ * 外に出ていく URL だけを許す。
+ * ここは画面から来た文字列をそのまま fetch する場所なので、
+ * 手元のネットワークを覗きに行けないようにしておく。
+ */
+function assertFetchable(raw) {
+	let url;
+	try {
+		url = new URL(raw);
+	} catch {
+		throw new HttpError(400, 'URL として読めません');
+	}
+	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+		throw new HttpError(400, 'http / https の URL だけ埋め込めます');
+	}
+	const host = url.hostname.toLowerCase();
+	const isPrivate =
+		host === 'localhost' ||
+		host.endsWith('.localhost') ||
+		host.endsWith('.local') ||
+		host === '[::1]' ||
+		/^127\./.test(host) ||
+		/^10\./.test(host) ||
+		/^192\.168\./.test(host) ||
+		/^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+		/^169\.254\./.test(host);
+	if (isPrivate) throw new HttpError(400, '手元のネットワークの URL は埋め込めません');
+	return url;
+}
+
+async function fetchLimited(url, maxBytes, accept) {
+	const res = await fetch(url, {
+		redirect: 'follow',
+		headers: { 'user-agent': UA, accept },
+		signal: AbortSignal.timeout(FETCH_TIMEOUT),
+	});
+	if (!res.ok) throw new HttpError(502, `取得できませんでした (${res.status})`);
+	const buf = Buffer.from(await res.arrayBuffer());
+	if (buf.length > maxBytes) throw new HttpError(502, 'ページが大きすぎます');
+	return { buf, res };
+}
+
+/** <meta> から値をひとつ拾う */
+function metaContent(html, keys) {
+	for (const key of keys) {
+		const re = new RegExp(
+			`<meta[^>]+(?:property|name)=["']${key}["'][^>]*content=["']([^"']*)["']|` +
+				`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${key}["']`,
+			'i',
+		);
+		const m = re.exec(html);
+		const value = m?.[1] ?? m?.[2];
+		if (value) return decodeEntities(value.trim());
+	}
+	return '';
+}
+
+function decodeEntities(v) {
+	return v
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;|&apos;/g, "'")
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&');
+}
+
+function youtubeId(url) {
+	const host = url.hostname.replace(/^www\./, '');
+	if (host === 'youtu.be') return url.pathname.slice(1).split('/')[0];
+	if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+		if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+		const m = /^\/(?:shorts|embed|live)\/([^/]+)/.exec(url.pathname);
+		if (m) return m[1];
+	}
+	return '';
+}
+
+const isXStatus = (url) =>
+	/^(www\.)?(x|twitter)\.com$/.test(url.hostname) && /\/status\/\d+/.test(url.pathname);
+
+/**
+ * 生の HTML から参照する画像を public/embeds/ に置く。
+ * 返すのは base 込みの絶対パス（例: /blog/embeds/xxx.webp）。
+ */
+async function saveEmbedAsset(slug, ext, buffer) {
+	if (!IMAGE_EXT.has(ext)) throw new HttpError(400, `対応していない画像形式です: ${ext}`);
+	const safeSlug = SLUG_RE.test(slug) ? slug : 'embed';
+	const name = `${safeSlug}-${Date.now()}.${ext}`;
+	await fs.mkdir(EMBED_DIR, { recursive: true });
+	const shrunk = await shrinkImage(buffer, ext);
+	await fs.writeFile(path.join(EMBED_DIR, name), shrunk.buffer);
+	return {
+		name,
+		url: `${await readBase()}/embeds/${name}`,
+		resized: shrunk.resized,
+		widthBefore: shrunk.widthBefore ?? null,
+		width: shrunk.width ?? null,
+		bytesBefore: buffer.length,
+		bytesAfter: shrunk.buffer.length,
+	};
+}
+
+/** OGP の画像を手元に落とす。落とせなければ画像なしで続ける。 */
+async function saveEmbedImage(slug, imageUrl) {
+	try {
+		const url = assertFetchable(imageUrl);
+		const { buf, res } = await fetchLimited(url, MAX_EMBED_IMAGE_BYTES, 'image/*');
+		const type = (res.headers.get('content-type') || '').split(';')[0].trim();
+		let ext = type.replace(/^image\//, '').toLowerCase();
+		if (ext === 'jpg') ext = 'jpeg';
+		if (!IMAGE_EXT.has(ext)) {
+			const fromPath = path.extname(url.pathname).slice(1).toLowerCase();
+			ext = fromPath === 'jpg' ? 'jpeg' : fromPath;
+		}
+		if (!IMAGE_EXT.has(ext)) return null;
+		return await saveEmbedAsset(slug, ext, buf);
+	} catch {
+		return null;
+	}
+}
+
+async function buildEmbed(slug, rawUrl) {
+	const url = assertFetchable(rawUrl);
+	const href = url.toString();
+
+	// --- YouTube
+	const videoId = youtubeId(url);
+	if (videoId && /^[\w-]{6,20}$/.test(videoId)) {
+		let title = 'YouTube の動画';
+		try {
+			const { buf } = await fetchLimited(
+				`https://www.youtube.com/oembed?url=${encodeURIComponent(href)}&format=json`,
+				MAX_HTML_BYTES,
+				'application/json',
+			);
+			title = JSON.parse(buf.toString('utf8')).title || title;
+		} catch {
+			// タイトルが取れなくても埋め込みは作れる
+		}
+		const html =
+			`<div class="embed-video">\n` +
+			`\t<iframe src="https://www.youtube-nocookie.com/embed/${escapeHtml(videoId)}" ` +
+			`title="${escapeHtml(title)}" loading="lazy" allowfullscreen ` +
+			`allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>\n` +
+			`</div>`;
+		return { type: 'youtube', title, html };
+	}
+
+	// --- X（旧 Twitter）
+	if (isXStatus(url)) {
+		try {
+			const { buf } = await fetchLimited(
+				`https://publish.twitter.com/oembed?url=${encodeURIComponent(href)}&omit_script=1&dnt=true`,
+				MAX_HTML_BYTES,
+				'application/json',
+			);
+			const data = JSON.parse(buf.toString('utf8'));
+			if (data.html) {
+				return {
+					type: 'x',
+					title: `${data.author_name ?? ''} のポスト`.trim(),
+					// widgets.js を読まないので、ただの引用として表示される。
+					// 外部スクリプトを入れないための意図的な選択。
+					html: `<figure class="embed-x">\n${data.html.trim()}\n</figure>`,
+				};
+			}
+		} catch {
+			// 取れなければ下のリンクカードに回す
+		}
+	}
+
+	// --- その他はリンクカード
+	const { buf } = await fetchLimited(href, MAX_HTML_BYTES, 'text/html,application/xhtml+xml');
+	const html = buf.toString('utf8');
+	const title =
+		metaContent(html, ['og:title', 'twitter:title']) ||
+		decodeEntities((/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || '').trim()) ||
+		url.hostname;
+	const description = metaContent(html, ['og:description', 'twitter:description', 'description']);
+	const siteName = metaContent(html, ['og:site_name']) || url.hostname.replace(/^www\./, '');
+	const imageUrl = metaContent(html, ['og:image', 'twitter:image', 'twitter:image:src']);
+
+	let image = null;
+	if (imageUrl) {
+		image = await saveEmbedImage(slug, new URL(imageUrl, href).toString());
+	}
+
+	const parts = [
+		`<a class="embed-card" href="${escapeHtml(href)}" target="_blank" rel="noopener">`,
+		image ? `\t<img src="${escapeHtml(image.url)}" alt="" loading="lazy" />` : '',
+		`\t<span class="embed-card-body">`,
+		`\t\t<span class="embed-card-title">${escapeHtml(title)}</span>`,
+		description ? `\t\t<span class="embed-card-desc">${escapeHtml(description)}</span>` : '',
+		`\t\t<span class="embed-card-site">${escapeHtml(siteName)}</span>`,
+		`\t</span>`,
+		`</a>`,
+	].filter(Boolean);
+
+	return { type: 'card', title, html: parts.join('\n') };
+}
+
+// ------------------------------------------------------------- 固定ページ
+
+// About のような固定ページ。記事と違って日付も下書きも無く、本文だけ。
+const PAGE_RE = /^[a-z][a-z0-9-]{0,40}$/;
+
+function pageFile(name) {
+	if (!PAGE_RE.test(name)) throw new HttpError(400, 'ページ名に使えるのは英小文字・数字・ハイフンだけです');
+	return path.join(PAGES_DIR, `${name}.md`);
+}
+
+async function listPages() {
+	let names = [];
+	try {
+		names = await fs.readdir(PAGES_DIR);
+	} catch {
+		return [];
+	}
+	const pages = [];
+	for (const file of names) {
+		if (!file.endsWith('.md')) continue;
+		const name = file.replace(/\.md$/, '');
+		const { data } = parsePost(await fs.readFile(path.join(PAGES_DIR, file), 'utf8'));
+		pages.push({ name, title: data.title || name });
+	}
+	return pages.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function readPage(name) {
+	let raw;
+	try {
+		raw = await fs.readFile(pageFile(name), 'utf8');
+	} catch {
+		throw new HttpError(404, 'ページが見つかりません');
+	}
+	const { data, body } = parsePost(raw);
+	return { name, title: data.title || '', description: data.description || '', body };
+}
+
+async function writePage(name, payload) {
+	if (!payload.title?.trim()) throw new HttpError(400, 'タイトルは必須です');
+	const text =
+		`---\n` +
+		`title: ${yamlString(payload.title)}\n` +
+		`description: ${yamlString(payload.description || '')}\n` +
+		`---\n\n${(payload.body || '').replace(/^\s+|\s+$/g, '')}\n`;
+	await fs.mkdir(PAGES_DIR, { recursive: true });
+	await fs.writeFile(pageFile(name), text, 'utf8');
+	return { ok: true, name };
+}
+
+// ------------------------------------------------------------- サイト設定
+
+const SITE_DEFAULTS = {
+	title: '',
+	description: '',
+	author: '',
+	tagline: '',
+	bannerImage: '',
+	socials: [],
+};
+
+async function readSite() {
+	try {
+		return { ...SITE_DEFAULTS, ...JSON.parse(await fs.readFile(SITE_FILE, 'utf8')) };
+	} catch {
+		return { ...SITE_DEFAULTS };
+	}
+}
+
+async function writeSite(payload) {
+	const current = await readSite();
+	const next = {
+		...current,
+		title: String(payload.title ?? current.title).trim(),
+		description: String(payload.description ?? current.description).trim(),
+		author: String(payload.author ?? current.author).trim(),
+		tagline: String(payload.tagline ?? current.tagline).trim(),
+		bannerImage: String(payload.bannerImage ?? current.bannerImage).trim(),
+		socials: (Array.isArray(payload.socials) ? payload.socials : current.socials)
+			.map((s) => ({ label: String(s?.label ?? '').trim(), href: String(s?.href ?? '').trim() }))
+			.filter((s) => s.label && s.href),
+	};
+	if (!next.title) throw new HttpError(400, 'サイト名は必須です');
+	await fs.writeFile(SITE_FILE, `${JSON.stringify(next, null, '\t')}\n`, 'utf8');
+	return next;
+}
+
+/** トップの見出し画像は public/ に置く。Astro を通さずそのまま配信される。 */
+async function saveBanner(ext, buffer) {
+	if (!IMAGE_EXT.has(ext)) throw new HttpError(400, `対応していない画像形式です: ${ext}`);
+	await fs.mkdir(PUBLIC_DIR, { recursive: true });
+	// 古い拡張子のものが残らないよう、いったん全部消す
+	for (const e of IMAGE_EXT) {
+		await fs.rm(path.join(PUBLIC_DIR, `banner.${e}`), { force: true });
+	}
+	const shrunk = await shrinkImage(buffer, ext);
+	await fs.writeFile(path.join(PUBLIC_DIR, `banner.${ext}`), shrunk.buffer);
+	const site = await writeSite({ ...(await readSite()), bannerImage: `/banner.${ext}` });
+	return { bannerImage: site.bannerImage, resized: shrunk.resized };
+}
+
+// --------------------------------------------------------------- 画像の棚卸し
+
+/**
+ * images/ の中身と、どの記事から参照されているかを返す。
+ * 記事を消しても画像は残るので、たまに掃除できるようにしておく。
+ */
+async function imageInventory() {
+	const dirs = [
+		{ dir: IMAGES_DIR, where: 'posts' },
+		{ dir: EMBED_DIR, where: 'embeds' },
+	];
+	const entries = [];
+	for (const { dir, where } of dirs) {
+		try {
+			for (const name of await fs.readdir(dir)) {
+				if (IMAGE_EXT.has(path.extname(name).slice(1).toLowerCase())) {
+					entries.push({ name, dir, where });
+				}
+			}
+		} catch {
+			// そのフォルダがまだ無いだけ
+		}
+	}
+	if (entries.length === 0) return { images: [] };
+
+	const sources = [];
+	for (const dir of [POSTS_DIR, PAGES_DIR]) {
+		let files = [];
+		try {
+			files = await fs.readdir(dir);
+		} catch {
+			continue;
+		}
+		for (const file of files) {
+			if (!/\.mdx?$/.test(file)) continue;
+			sources.push({
+				slug: file.replace(/\.mdx?$/, ''),
+				text: await fs.readFile(path.join(dir, file), 'utf8'),
+			});
+		}
+	}
+
+	const images = [];
+	for (const { name, dir, where } of entries) {
+		const usedBy = sources.filter((s) => s.text.includes(name)).map((s) => s.slug);
+		const stat = await fs.stat(path.join(dir, name));
+		images.push({ name, where, bytes: stat.size, usedBy });
+	}
+	images.sort((a, b) => a.name.localeCompare(b.name));
+	return { images };
+}
+
+async function deleteUnusedImages() {
+	const { images } = await imageInventory();
+	const unused = images.filter((i) => i.usedBy.length === 0);
+	for (const image of unused) {
+		const dir = image.where === 'embeds' ? EMBED_DIR : IMAGES_DIR;
+		await fs.rm(path.join(dir, image.name), { force: true });
+	}
+	return { deleted: unused.map((i) => i.name), bytes: unused.reduce((n, i) => n + i.bytes, 0) };
+}
+
+// ------------------------------------------------------ 未公開の変更とビルド
+
+/** 公開ボタンを押す前に、何が送られるのかを見せるための一覧 */
+async function pendingChanges() {
+	// git() は trim するが、--porcelain は先頭2桁が状態なので、ここでは生のまま使う
+	let out = '';
+	try {
+		({ stdout: out } = await execFileAsync('git', ['status', '--porcelain'], { cwd: ROOT }));
+	} catch {
+		return { files: [] };
+	}
+	const lines = out.split('\n').filter(Boolean);
+	if (lines.length === 0) return { files: [] };
+	const files = lines.map((line) => {
+		const code = line.slice(0, 2).trim();
+		const file = line.slice(3).trim();
+		const label =
+			code === '??' ? '新規' : code.startsWith('D') ? '削除' : code.startsWith('A') ? '追加' : '変更';
+		return { file, label };
+	});
+	return { files };
+}
+
+/**
+ * 公開したあと、GitHub 側のビルドが終わったかを見る。
+ * gh コマンドが無い環境では状態を返さない（公開自体は成功している）。
+ */
+async function deployStatus() {
+	try {
+		const { stdout } = await execFileAsync(
+			'gh',
+			['run', 'list', '--limit', '1', '--json', 'status,conclusion,displayTitle,url'],
+			{ cwd: ROOT, timeout: 15000 },
+		);
+		const run = JSON.parse(stdout)[0];
+		if (!run) return { available: true, status: 'none' };
+		return {
+			available: true,
+			status: run.status,
+			conclusion: run.conclusion,
+			title: run.displayTitle,
+			url: run.url,
+		};
+	} catch {
+		return { available: false };
+	}
 }
 
 // ------------------------------------------------------------------------ git
@@ -490,9 +942,12 @@ async function handleApi(req, res, url) {
 	if (pathname === '/api/state' && method === 'GET') {
 		return sendJson(res, 200, {
 			posts: await listPosts(),
+			pages: await listPages(),
+			site: await readSite(),
 			git: await gitStatus(),
 			devOrigin: DEV_ORIGIN,
 			postUrlPrefix: await postUrlPrefix(),
+			liveOrigin: await readSiteUrl(),
 			devUp: await isDevServerUp(),
 			today: today(),
 		});
@@ -533,6 +988,71 @@ async function handleApi(req, res, url) {
 		const slug = searchParams.get('slug') || 'image';
 		const ext = (searchParams.get('ext') || '').toLowerCase();
 		return sendJson(res, 200, await saveImage(slug, ext, await readBody(req)));
+	}
+
+	const pageMatch = /^\/api\/pages\/([^/]+)$/.exec(pathname);
+	if (pageMatch) {
+		const name = decodeURIComponent(pageMatch[1]);
+		if (method === 'GET') return sendJson(res, 200, await readPage(name));
+		if (method === 'PUT') {
+			const payload = JSON.parse((await readBody(req)).toString('utf8'));
+			return sendJson(res, 200, await writePage(name, payload));
+		}
+	}
+
+	if (pathname === '/api/site') {
+		if (method === 'GET') return sendJson(res, 200, await readSite());
+		if (method === 'PUT') {
+			const payload = JSON.parse((await readBody(req)).toString('utf8'));
+			return sendJson(res, 200, await writeSite(payload));
+		}
+	}
+
+	if (pathname === '/api/banner' && method === 'POST') {
+		const ext = (searchParams.get('ext') || '').toLowerCase();
+		return sendJson(res, 200, await saveBanner(ext, await readBody(req)));
+	}
+
+	// エディタの画面で画像を小さく見せるためだけの口
+	if (pathname === '/api/image-file' && method === 'GET') {
+		const name = path.basename(searchParams.get('name') || '');
+		const ext = path.extname(name).slice(1).toLowerCase();
+		if (!IMAGE_EXT.has(ext)) throw new HttpError(400, '画像ではありません');
+		const buf = await fs
+			.readFile(path.join(IMAGES_DIR, name))
+			.catch(() => fs.readFile(path.join(EMBED_DIR, name)).catch(() => null));
+		if (!buf) throw new HttpError(404, '画像が見つかりません');
+		res.writeHead(200, { 'content-type': `image/${ext}`, 'cache-control': 'no-store' });
+		return res.end(buf);
+	}
+
+	// テンプレートの <figure> など、生の HTML から参照する画像用
+	if (pathname === '/api/public-image' && method === 'POST') {
+		const slug = searchParams.get('slug') || 'embed';
+		const ext = (searchParams.get('ext') || '').toLowerCase();
+		return sendJson(res, 200, await saveEmbedAsset(slug, ext, await readBody(req)));
+	}
+
+	if (pathname === '/api/images' && method === 'GET') {
+		return sendJson(res, 200, await imageInventory());
+	}
+
+	if (pathname === '/api/images/unused' && method === 'DELETE') {
+		return sendJson(res, 200, await deleteUnusedImages());
+	}
+
+	if (pathname === '/api/changes' && method === 'GET') {
+		return sendJson(res, 200, await pendingChanges());
+	}
+
+	if (pathname === '/api/deploy' && method === 'GET') {
+		return sendJson(res, 200, await deployStatus());
+	}
+
+	if (pathname === '/api/embed' && method === 'GET') {
+		const slug = searchParams.get('slug') || 'embed';
+		const target = searchParams.get('url') || '';
+		return sendJson(res, 200, await buildEmbed(slug, target));
 	}
 
 	if (pathname === '/api/publish' && method === 'POST') {

@@ -1,13 +1,20 @@
-// サイト全体で使う設定値。ここを書き換えればヘッダー・フッター・RSSに反映される。
+// サイト全体で使う設定値。
+//
+// 実際の値は src/site.json にある。エディタの「サイト設定」から書き換えるため、
+// TypeScript ではなく JSON に置いている。手で直してもよい。
+import site from './site.json';
 
-export const SITE_TITLE = 'jiodayo';
-export const SITE_DESCRIPTION = '考えたこと、作ったものの置き場所。';
+export const SITE_TITLE: string = site.title;
+export const SITE_DESCRIPTION: string = site.description;
 
 /** フッターの著作権表示に使う名前 */
-export const AUTHOR = 'jiodayo';
+export const AUTHOR: string = site.author;
 
-/** ヘッダー・フッターに並べるリンク。不要な行は消してよい */
-export const SOCIALS = [
-	{ label: 'GitHub', href: 'https://github.com/jiodayo' },
-	// { label: 'X', href: 'https://x.com/your_id' },
-];
+/** トップのサイト名の下に出る一行。空なら出ない */
+export const TAGLINE: string = site.tagline ?? '';
+
+/** トップの見出し画像。src/site.json に public/ からのパスを書く。空なら出ない */
+export const BANNER_IMAGE: string = site.bannerImage ?? '';
+
+/** ヘッダー・About に並べるリンク。空配列なら何も出ない */
+export const SOCIALS: { label: string; href: string }[] = site.socials ?? [];

@@ -21,4 +21,13 @@ const blog = defineCollection({
 		}),
 });
 
-export const collections = { blog };
+// About のような固定ページ。記事と同じようにエディタから編集できるようにする。
+const pages = defineCollection({
+	loader: glob({ base: './src/content/pages', pattern: '**/*.md' }),
+	schema: z.object({
+		title: z.string(),
+		description: z.string().default(''),
+	}),
+});
+
+export const collections = { blog, pages };

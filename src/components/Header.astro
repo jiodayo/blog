@@ -1,5 +1,5 @@
 ---
-import { SITE_TITLE, SOCIALS } from '../consts';
+import { SITE_TITLE } from '../consts';
 import HeaderLink from './HeaderLink.astro';
 import { url } from '../lib/url';
 ---
@@ -13,15 +13,6 @@ import { url } from '../lib/url';
 			<HeaderLink href="/">ホーム</HeaderLink>
 			<HeaderLink href="/posts">ブログ</HeaderLink>
 			<HeaderLink href="/about">About</HeaderLink>
-		</div>
-		<div class="social-links">
-			{
-				SOCIALS.map((s) => (
-					<a href={s.href} target="_blank" rel="me noopener">
-						{s.label}
-					</a>
-				))
-			}
 		</div>
 	</nav>
 </header>
@@ -58,13 +49,7 @@ import { url } from '../lib/url';
 		text-decoration: none;
 		border-bottom-color: var(--accent);
 	}
-	.social-links {
-		display: flex;
-	}
 	@media (max-width: 720px) {
-		.social-links {
-			display: none;
-		}
 		nav a {
 			padding: 1em 0.35em;
 		}

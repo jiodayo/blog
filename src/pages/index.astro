@@ -2,7 +2,7 @@
 import { getPosts } from '../lib/posts';
 import Page from '../layouts/Page.astro';
 import PostList from '../components/PostList.astro';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import { BANNER_IMAGE, SITE_DESCRIPTION, SITE_TITLE, TAGLINE } from '../consts';
 import { url } from '../lib/url';
 
 // 新しい順に並べて、トップには5件だけ出す
@@ -10,8 +10,9 @@ const posts = (await getPosts()).slice(0, 5);
 ---
 
 <Page title={SITE_TITLE} description={SITE_DESCRIPTION}>
+	{BANNER_IMAGE && <img class="banner" src={url(BANNER_IMAGE)} alt="" />}
 	<h1>{SITE_TITLE}</h1>
-	<p class="lead">{SITE_DESCRIPTION}</p>
+	<p class="lead">{TAGLINE || SITE_DESCRIPTION}</p>
 
 	<h2>最新の記事</h2>
 	{
@@ -27,6 +28,13 @@ const posts = (await getPosts()).slice(0, 5);
 </Page>
 
 <style>
+	.banner {
+		display: block;
+		width: 100%;
+		height: auto;
+		margin-bottom: 1.5em;
+		border-radius: 10px;
+	}
 	.lead {
 		color: rgb(var(--gray));
 	}
