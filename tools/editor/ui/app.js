@@ -548,7 +548,8 @@ async function uploadImage(file) {
 	const ext = (file.name.split('.').pop() || 'png').toLowerCase();
 	setSaveState('画像を保存中…');
 	const r = await api(
-		`/api/images?slug=${encodeURIComponent(state.current || 'image')}&ext=${encodeURIComponent(ext)}`,
+		`/api/images?slug=${encodeURIComponent(state.current || 'image')}` +
+			`&ext=${encodeURIComponent(ext)}&kind=${state.kind}`,
 		{ method: 'POST', body: file },
 	);
 	if (r.resized) {

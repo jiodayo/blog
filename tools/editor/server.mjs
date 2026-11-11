@@ -29,6 +29,9 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 // 生の HTML の中の <img> は Astro が面倒を見ないので、
 // 記事からの相対パスだと 404 になる。public/ に置いて絶対パスで参照する。
 const EMBED_DIR = path.join(PUBLIC_DIR, 'embeds');
+// 固定ページの画像。Markdown の ./images/ は「その .md があるフォルダ」から
+// 解決されるので、記事とページで置き場所を分ける必要がある。
+const PAGE_IMAGES_DIR = path.join(PAGES_DIR, 'images');
 const UI_DIR = path.join(HERE, 'ui');
 
 const EDITOR_PORT = 4322;
@@ -299,15 +302,16 @@ async function shrinkImage(buffer, ext) {
 	}
 }
 
-async function saveImage(slug, ext, buffer) {
+async function saveImage(slug, ext, buffer, kind = 'post') {
 	if (!IMAGE_EXT.has(ext)) throw new HttpError(400, `対応していない画像形式です: ${ext}`);
 	const safeSlug = SLUG_RE.test(slug) ? slug : 'image';
 	const name = `${safeSlug}-${Date.now()}.${ext}`;
-	await fs.mkdir(IMAGES_DIR, { recursive: true });
+	const dir = kind === 'page' ? PAGE_IMAGES_DIR : IMAGES_DIR;
+	await fs.mkdir(dir, { recursive: true });
 
 	const bytesBefore = buffer.length;
 	const shrunk = await shrinkImage(buffer, ext);
-	await fs.writeFile(path.join(IMAGES_DIR, name), shrunk.buffer);
+	await fs.writeFile(path.join(dir, name), shrunk.buffer);
 
 	// 記事からの相対パス。ここから先は Astro が WebP への変換を担当する
 	return {
@@ -652,6 +656,7 @@ async function saveBanner(ext, buffer) {
 async function imageInventory() {
 	const dirs = [
 		{ dir: IMAGES_DIR, where: 'posts' },
+		{ dir: PAGE_IMAGES_DIR, where: 'pages' },
 		{ dir: EMBED_DIR, where: 'embeds' },
 	];
 	const entries = [];
@@ -699,7 +704,8 @@ async function deleteUnusedImages() {
 	const { images } = await imageInventory();
 	const unused = images.filter((i) => i.usedBy.length === 0);
 	for (const image of unused) {
-		const dir = image.where === 'embeds' ? EMBED_DIR : IMAGES_DIR;
+		const dir =
+			image.where === 'embeds' ? EMBED_DIR : image.where === 'pages' ? PAGE_IMAGES_DIR : IMAGES_DIR;
 		await fs.rm(path.join(dir, image.name), { force: true });
 	}
 	return { deleted: unused.map((i) => i.name), bytes: unused.reduce((n, i) => n + i.bytes, 0) };
@@ -987,7 +993,8 @@ async function handleApi(req, res, url) {
 	if (pathname === '/api/images' && method === 'POST') {
 		const slug = searchParams.get('slug') || 'image';
 		const ext = (searchParams.get('ext') || '').toLowerCase();
-		return sendJson(res, 200, await saveImage(slug, ext, await readBody(req)));
+		const kind = searchParams.get('kind') === 'page' ? 'page' : 'post';
+		return sendJson(res, 200, await saveImage(slug, ext, await readBody(req), kind));
 	}
 
 	const pageMatch = /^\/api\/pages\/([^/]+)$/.exec(pathname);
@@ -1018,9 +1025,11 @@ async function handleApi(req, res, url) {
 		const name = path.basename(searchParams.get('name') || '');
 		const ext = path.extname(name).slice(1).toLowerCase();
 		if (!IMAGE_EXT.has(ext)) throw new HttpError(400, '画像ではありません');
-		const buf = await fs
-			.readFile(path.join(IMAGES_DIR, name))
-			.catch(() => fs.readFile(path.join(EMBED_DIR, name)).catch(() => null));
+		let buf = null;
+		for (const dir of [IMAGES_DIR, PAGE_IMAGES_DIR, EMBED_DIR]) {
+			buf = await fs.readFile(path.join(dir, name)).catch(() => null);
+			if (buf) break;
+		}
 		if (!buf) throw new HttpError(404, '画像が見つかりません');
 		res.writeHead(200, { 'content-type': `image/${ext}`, 'cache-control': 'no-store' });
 		return res.end(buf);
