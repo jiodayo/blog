@@ -238,6 +238,16 @@ final class StatusView: NSView {
 
 // ------------------------------------------------------------------ 本体
 
+/// ウィンドウの大半が、どれかの画面の中に入っているか。
+/// 外付けディスプレイを外したあとなどに、見えない場所へ復元してしまうのを防ぐ。
+func isOnSomeScreen(_ frame: NSRect) -> Bool {
+	for screen in NSScreen.screens {
+		let overlap = screen.visibleFrame.intersection(frame)
+		if overlap.width > 120 && overlap.height > 80 { return true }
+	}
+	return false
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
 	private var window: NSWindow!
 	private var webView: WKWebView!
@@ -289,6 +299,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 		return true
 	}
 
+	/// Dock のアイコンを押したとき。しまい込んだウィンドウを出し直す。
+	func applicationShouldHandleReopen(_ app: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+		if !flag { showWindow() }
+		return true
+	}
+
 	// ------------------------------------------------------------ 画面
 
 	private func buildWindow() {
@@ -300,8 +316,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 		window.title = "ブログ"
 		window.titlebarAppearsTransparent = false
 		window.minSize = NSSize(width: 900, height: 560)
+		// 前に閉じたときの位置と大きさに戻す。画面の構成が変わっていて、
+		// 保存された場所がもうどこにも無いときは真ん中に出し直す。
+		let restored = window.setFrameUsingName("BlogEditorWindow")
 		window.setFrameAutosaveName("BlogEditorWindow")
-		window.center()
+		if !restored || !isOnSomeScreen(window.frame) {
+			window.center()
+		}
+
+		// 操作スペースを切り替えても、ウィンドウはいま見ている画面についてくる。
+		// 最初に開いた操作スペースに置き去りになると、見失ってしまう。
+		// ただしフルスクリーンのアプリを見ているときだけは、macOS の決まりで
+		// そこへ普通のウィンドウを置けない。自分もフルスクリーンになれるよう
+		// fullScreenPrimary を付けて、⌃⌘F で並べられるようにしておく。
+		window.collectionBehavior = [.managed, .moveToActiveSpace, .fullScreenPrimary]
 
 		let container = NSView(frame: frame)
 
@@ -324,6 +352,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 		container.addSubview(webView)
 
 		window.contentView = container
+		showWindow()
+	}
+
+	/// ウィンドウを、いま見ている画面の手前に出す。
+	private func showWindow() {
+		if window.isMiniaturized { window.deminiaturize(nil) }
+		if !isOnSomeScreen(window.frame) { window.center() }
 		window.makeKeyAndOrderFront(nil)
 		NSApp.activate(ignoringOtherApps: true)
 	}
