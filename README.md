@@ -83,7 +83,7 @@ npm run editor
 
 ## ブログ.app のこと
 
-`tools/mac-app/` に置いてある。Swift と WKWebView だけで書いた 300KB ほどのアプリで、
+`tools/mac-app/` に置いてある。Swift と WKWebView だけで書いた 1MB 足らずのアプリで、
 中身は `tools/editor` のエディタそのもの。表示先がブラウザのタブからアプリの
 ウィンドウに変わるだけなので、機能は何も変わらない。
 
