@@ -1089,6 +1089,27 @@ const server = createServer(async (req, res) => {
 	}
 });
 
+/**
+ * ブログ.app から起動されたときは、アプリが落ちたら一緒に終わる。
+ *
+ * アプリは終了時にこのプロセスを止めるが、強制終了されると
+ * その処理が走らず、node だけが残ってポートを握り続けてしまう。
+ * 親がいなくなったことを自分で見にいくほうが確実。
+ */
+function exitWithParent(pid) {
+	setInterval(() => {
+		try {
+			process.kill(pid, 0); // 生存確認だけ。シグナルは送らない
+		} catch {
+			console.log('呼び出し元が終了したので、エディタも終わります。');
+			process.exit(0);
+		}
+	}, 3000).unref();
+}
+
+const parentPid = Number(process.env.BLOG_PARENT_PID);
+if (Number.isInteger(parentPid) && parentPid > 1) exitWithParent(parentPid);
+
 server.listen(EDITOR_PORT, '127.0.0.1', async () => {
 	console.log('');
 	console.log('  ブログエディタ');

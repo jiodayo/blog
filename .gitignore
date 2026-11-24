@@ -28,3 +28,6 @@ pnpm-debug.log*
 
 # VS Code 拡張のパッケージ（install.sh が作って消す）
 *.vsix
+
+# ブログ.app（tools/mac-app/build.sh が組み立てる）
+ブログ.app/
