@@ -677,3 +677,178 @@ body {
 		display: none;
 	}
 }
+
+/* ------------------------------------------------- タイトルと記事の設定
+
+   タイトル以外の項目は普段たたんでおく。本文に使える高さが 200px ほど増える。 */
+
+.headline {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.7rem 1rem 0.6rem;
+}
+.headline input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0.35rem 0.5rem;
+	border: 1px solid transparent;
+	border-radius: var(--radius);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	font-size: 1.15rem;
+	font-weight: 700;
+	line-height: 1.4;
+}
+.headline input::placeholder {
+	color: var(--text-dim);
+	font-weight: 400;
+}
+.headline input:hover {
+	border-color: var(--border);
+}
+.headline input:focus {
+	background: var(--bg);
+	border-color: var(--border);
+	outline: 2px solid var(--accent);
+	outline-offset: -1px;
+}
+.meta-toggle {
+	flex: none;
+}
+.meta-toggle::after {
+	content: ' ▾';
+	font-size: 0.7em;
+}
+.meta-toggle[aria-expanded='false']::after {
+	content: ' ▸';
+}
+
+/* たたんでいるときに、設定の中身を一行で見せる */
+.meta-digest {
+	display: block;
+	width: 100%;
+	padding: 0 1rem 0.6rem;
+	border: 0;
+	background: none;
+	color: var(--text-dim);
+	font: inherit;
+	font-size: 0.72rem;
+	text-align: left;
+	cursor: pointer;
+}
+.meta-digest:hover {
+	color: var(--text);
+}
+.meta-digest .sep {
+	opacity: 0.45;
+	margin: 0 0.45rem;
+}
+.meta-digest .is-draft {
+	color: var(--warn);
+	font-weight: 700;
+}
+
+.meta {
+	border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------- 切り替えボタン */
+
+.btn.toggle {
+	flex: none;
+}
+.btn.toggle[aria-pressed='true'] {
+	border-color: var(--accent);
+	color: var(--accent);
+	font-weight: 700;
+}
+
+.statusline-btn {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--text-dim);
+	font: inherit;
+	font-size: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	cursor: pointer;
+}
+.statusline-btn:hover {
+	color: var(--text);
+}
+
+/* ----------------------------------------------------------- 集中モード
+
+   本文だけにする。記事一覧とプレビューを消して、行長を読みやすい幅で止める。 */
+
+body.zen .sidebar,
+body.zen .preview,
+body.zen .meta,
+body.zen .meta-digest,
+body.zen #btn-delete {
+	display: none;
+}
+body.zen .layout {
+	grid-template-columns: 1fr;
+}
+body.zen .editor {
+	border-right: 0;
+}
+body.zen .headline,
+body.zen .toolbar,
+body.zen .statusline {
+	max-width: 48rem;
+	width: 100%;
+	margin: 0 auto;
+}
+body.zen .toolbar {
+	border-bottom: 0;
+	background: none;
+}
+body.zen .statusline {
+	border-top: 0;
+}
+body.zen .body {
+	max-width: 48rem;
+	width: 100%;
+	margin: 0 auto;
+	font-size: 0.95rem;
+	line-height: 2;
+}
+body.zen .headline input {
+	font-size: 1.45rem;
+}
+
+/* ------------------------------------------------- ショートカット一覧 */
+
+.keys {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.4rem 1rem;
+	align-items: baseline;
+	font-size: 0.82rem;
+}
+.keys kbd {
+	justify-self: start;
+	padding: 0.1rem 0.4rem;
+	border: 1px solid var(--border);
+	border-bottom-width: 2px;
+	border-radius: 5px;
+	background: var(--bg-sub);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.78rem;
+	white-space: nowrap;
+}
+.keys .grp {
+	grid-column: span 2;
+	margin-top: 0.6rem;
+	color: var(--text-dim);
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+.keys .grp:first-child {
+	margin-top: 0;
+}

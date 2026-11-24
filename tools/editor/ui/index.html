@@ -36,11 +36,15 @@
 
 			<!-- 編集 -->
 			<section class="editor" id="editor" hidden>
-				<div class="meta">
-					<label class="field field-wide">
-						<span>タイトル</span>
-						<input id="f-title" type="text" placeholder="記事のタイトル" />
-					</label>
+				<div class="headline">
+					<input id="f-title" type="text" placeholder="記事のタイトル" aria-label="タイトル" />
+					<button id="btn-meta" class="btn btn-small meta-toggle" aria-expanded="true" aria-controls="meta" title="記事の設定を開閉">
+						設定
+					</button>
+				</div>
+				<button id="meta-digest" class="meta-digest" hidden aria-controls="meta"></button>
+
+				<div class="meta" id="meta">
 					<label class="field field-wide">
 						<span>説明<small>一覧とSNSカードに出る</small></span>
 						<input id="f-description" type="text" placeholder="一行の説明" />
@@ -97,6 +101,7 @@
 						<button id="btn-template" title="よく使う書き方を挿入">⊞ テンプレート</button>
 						<div id="template-menu" class="menu" hidden></div>
 					</span>
+					<button id="btn-zen" title="本文だけにする（Esc でもどる）">⤢ 集中</button>
 					<span class="toolbar-hint" id="toolbar-hint">画像はエディタに貼り付け／ドロップでも入ります</span>
 					<span class="toolbar-grow"></span>
 					<button id="btn-delete" class="danger" title="この記事を削除">削除</button>
@@ -111,6 +116,7 @@
 				<div class="statusline">
 					<span id="count-chars">0 文字</span>
 					<span id="count-lines">0 行</span>
+					<button id="btn-help" class="statusline-btn" title="ショートカット一覧（⌘/）">⌘/ ショートカット</button>
 					<span class="toolbar-grow"></span>
 					<a id="live-link" class="live-link" target="_blank" rel="noopener" hidden>公開中のページを開く ↗</a>
 				</div>
@@ -121,6 +127,8 @@
 				<div class="preview-head">
 					<span>プレビュー</span>
 					<span id="preview-url" class="preview-url"></span>
+					<button id="btn-sync" class="btn btn-small toggle" title="書いている見出しにプレビューを合わせる">追従</button>
+					<button id="btn-article-only" class="btn btn-small toggle" title="ヘッダ・サイドバー・フッタを隠す">記事だけ</button>
 					<button id="btn-reload" class="btn btn-small">更新</button>
 				</div>
 				<div class="preview-body">

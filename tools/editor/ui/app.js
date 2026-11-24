@@ -50,6 +50,13 @@ const el = {
 	modalLog: $('modal-log'),
 	modalActions: $('modal-actions'),
 	hint: $('toolbar-hint'),
+	meta: $('meta'),
+	metaToggle: $('btn-meta'),
+	metaDigest: $('meta-digest'),
+	zen: $('btn-zen'),
+	help: $('btn-help'),
+	sync: $('btn-sync'),
+	articleOnly: $('btn-article-only'),
 };
 
 const state = {
@@ -145,6 +152,7 @@ function applyKindVisibility() {
 	el.tagSuggestRow.hidden = !isPost || el.tagSuggest.children.length === 0;
 	el.hero.closest('.field')?.toggleAttribute('hidden', !isPost);
 	el.delete.hidden = !isPost;
+	renderMetaDigest();
 }
 
 function renderCounts() {
@@ -270,12 +278,15 @@ async function openPage(name) {
 	el.title.value = page.title;
 	el.description.value = page.description;
 	el.body.value = page.body;
+	// value を入れ直すとカーソルが末尾に飛ぶ。開いた直後は先頭を見たい。
+	el.body.setSelectionRange(0, 0);
 	el.editor.hidden = false;
 	applyKindVisibility();
 	renderCounts();
 	state.listSignature = null;
 	renderList();
 	setSaveState('保存済み', 'ok');
+	lastHeading = -1;
 	updatePreview();
 }
 
@@ -292,6 +303,7 @@ async function openPost(slug) {
 	el.slug.value = post.slug;
 	el.draft.checked = post.draft;
 	el.body.value = post.body;
+	el.body.setSelectionRange(0, 0);
 	el.editor.hidden = false;
 	setHero(post.heroImage);
 	renderTagSuggestions();
@@ -300,10 +312,12 @@ async function openPost(slug) {
 	state.listSignature = null;
 	renderList();
 	setSaveState('保存済み', 'ok');
+	lastHeading = -1;
 	updatePreview();
 }
 
 function scheduleSave() {
+	renderMetaDigest();
 	setSaveState('編集中…');
 	clearTimeout(state.saveTimer);
 	state.saveTimer = setTimeout(() => {
@@ -442,6 +456,7 @@ function swapFrame(url) {
 	next.id = 'preview-frame';
 	next.title = 'プレビュー';
 	next.src = url;
+	next.addEventListener('load', onPreviewLoad);
 	el.frame.replaceWith(next);
 	el.frame = next;
 }
@@ -765,6 +780,262 @@ function openModal(title, content, choices) {
 		el.modal.addEventListener('click', onBackdrop);
 		document.addEventListener('keydown', onKey);
 	});
+}
+
+// ------------------------------------------------------- 記事の設定の開閉
+
+/**
+ * タイトル以外の項目（説明・タグ・日付・スラッグ・下書き・ヘッダ画像）は
+ * 一度決めたらあまり触らないので、普段はたたんでおく。
+ * 本文に使える高さがそのぶん増える。開いているかは次に開いたときも覚えている。
+ */
+const META_KEY = 'editor.meta.open';
+
+function metaIsOpen() {
+	try {
+		return localStorage.getItem(META_KEY) !== '0';
+	} catch {
+		return true;
+	}
+}
+
+function setMetaOpen(open) {
+	el.meta.hidden = !open;
+	el.metaDigest.hidden = open;
+	el.metaToggle.setAttribute('aria-expanded', String(open));
+	try {
+		localStorage.setItem(META_KEY, open ? '1' : '0');
+	} catch {
+		/* プライベートウィンドウなどで保存できなくても動きは変えない */
+	}
+	renderMetaDigest();
+}
+
+/** たたんでいるときに、中身を一行で見せる */
+function renderMetaDigest() {
+	if (el.metaDigest.hidden) return;
+	const parts = [];
+	if (state.kind === 'post') {
+		if (el.draft.checked) parts.push('<span class="is-draft">下書き</span>');
+		const tags = currentTags();
+		parts.push(tags.length ? escapeHtml(tags.join('、')) : 'タグなし');
+		if (el.pubDate.value) parts.push(escapeHtml(el.pubDate.value.replaceAll('-', '/')));
+		if (state.heroImage) parts.push('ヘッダ画像あり');
+		if (el.slug.value) parts.push(`/${escapeHtml(el.slug.value)}`);
+	} else {
+		parts.push(el.description.value ? escapeHtml(el.description.value) : '説明なし');
+	}
+	el.metaDigest.innerHTML = parts.join('<span class="sep">·</span>');
+}
+
+// ----------------------------------------------------------- 集中モード
+
+function setZen(on) {
+	document.body.classList.toggle('zen', on);
+	el.zen.setAttribute('aria-pressed', String(on));
+	if (on) el.body.focus();
+}
+
+// --------------------------------------------------- プレビューの見え方
+
+/**
+ * プレビューは iframe だが、dev サーバーへはエディタ自身が中継しているので
+ * エディタと同じオリジンになる。そのおかげで中の DOM を触れる。
+ */
+const PREF_KEY = 'editor.preview';
+const prefs = { sync: true, articleOnly: false };
+try {
+	Object.assign(prefs, JSON.parse(localStorage.getItem(PREF_KEY) || '{}'));
+} catch {
+	/* 壊れていたら既定のまま */
+}
+
+function savePrefs() {
+	try {
+		localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+	} catch {
+		/* 保存できなくても動きは変えない */
+	}
+}
+
+function previewDoc() {
+	try {
+		const doc = el.frame.contentDocument;
+		return doc?.body ? doc : null;
+	} catch {
+		return null; // 読み込み中など
+	}
+}
+
+const ONLY_STYLE_ID = '__editor-article-only';
+
+/** ヘッダ・サイドバー・フッタを隠して、記事だけを広く見せる */
+function applyArticleOnly() {
+	const doc = previewDoc();
+	if (!doc) return;
+	const existing = doc.getElementById(ONLY_STYLE_ID);
+	if (!prefs.articleOnly) {
+		existing?.remove();
+		return;
+	}
+	const tag = existing ?? doc.createElement('style');
+	tag.id = ONLY_STYLE_ID;
+	// body 直下の header / footer だけを狙う。記事のタイトルも header なので、
+	// 子孫セレクタにするとタイトルまで消えてしまう。
+	tag.textContent = `
+		body > header,
+		body > footer,
+		aside.sidebar { display: none !important; }
+		.layout { display: block !important; }
+		main { max-width: 46rem; margin: 0 auto; }
+	`;
+	if (!existing) doc.head.append(tag);
+}
+
+/**
+ * カーソルより前にある見出しの数を数える。
+ * コードブロックの中の # は見出しではないので飛ばす。
+ */
+function headingIndexAtCursor() {
+	const before = el.body.value.slice(0, el.body.selectionStart);
+	let inFence = false;
+	let count = 0;
+	for (const line of before.split('\n')) {
+		if (/^\s*(```|~~~)/.test(line)) {
+			inFence = !inFence;
+			continue;
+		}
+		if (inFence) continue;
+		if (/^#{1,6}\s/.test(line)) count++;
+	}
+	return count;
+}
+
+/** 書いている見出しの位置までプレビューを動かす */
+function syncPreviewToCursor() {
+	const doc = previewDoc();
+	const prose = doc?.querySelector('.prose');
+	if (!prose) return;
+	const index = headingIndexAtCursor();
+	if (index === 0) {
+		doc.defaultView?.scrollTo({ top: 0, behavior: 'smooth' });
+		return;
+	}
+	const heads = prose.querySelectorAll('h1, h2, h3, h4, h5, h6');
+	heads[index - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 同じ見出しの中で打っている間は動かさない。
+// 一文字ごとに飛ぶと、書いている最中に視界がうるさくなる。
+let lastHeading = -1;
+let syncTimer = null;
+function maybeSync() {
+	if (!prefs.sync) return;
+	clearTimeout(syncTimer);
+	syncTimer = setTimeout(() => {
+		const index = headingIndexAtCursor();
+		if (index === lastHeading) return;
+		lastHeading = index;
+		syncPreviewToCursor();
+	}, 250);
+}
+
+function onPreviewLoad() {
+	applyArticleOnly();
+	lastHeading = -1;
+	maybeSync();
+}
+
+function setSync(on) {
+	prefs.sync = on;
+	el.sync.setAttribute('aria-pressed', String(on));
+	savePrefs();
+	if (on) {
+		lastHeading = -1;
+		maybeSync();
+	}
+}
+
+function setArticleOnly(on) {
+	prefs.articleOnly = on;
+	el.articleOnly.setAttribute('aria-pressed', String(on));
+	savePrefs();
+	applyArticleOnly();
+}
+
+// ------------------------------------------------------- 箇条書きの継続
+
+// 「- 」「* 」「1. 」「- [ ] 」と引用「> 」を Enter で続ける。
+const LIST_RE = /^(\s*)(?:([-*+])|(\d+)([.)]))([ \t]+)(\[[ xX]\][ \t]+)?(.*)$/;
+const QUOTE_RE = /^(\s*)>[ \t]?(.*)$/;
+
+/**
+ * 箇条書きの行で Enter を押したら、次の行にも同じ印をつける。
+ * 中身が空の項目で押したときは、印を消して抜ける（リストの終わり）。
+ * 書き換えは replaceRange 経由なので ⌘Z はそのまま効く。
+ */
+function continueList(event) {
+	const ta = el.body;
+	if (ta.selectionStart !== ta.selectionEnd) return false;
+	const at = ta.selectionStart;
+	const lineStart = ta.value.lastIndexOf('\n', at - 1) + 1;
+	const line = ta.value.slice(lineStart, at);
+
+	const list = LIST_RE.exec(line);
+	if (list) {
+		const [, indent, bullet, num, delim, space, task, rest] = list;
+		event.preventDefault();
+		if (!rest.trim()) {
+			replaceRange(lineStart, at, ''); // 空の項目 → リストを抜ける
+			return true;
+		}
+		const marker = bullet ? bullet + space : `${Number(num) + 1}${delim}${space}`;
+		replaceRange(at, at, `\n${indent}${marker}${task ? '[ ] ' : ''}`);
+		return true;
+	}
+
+	const quote = QUOTE_RE.exec(line);
+	if (quote) {
+		event.preventDefault();
+		if (!quote[2].trim()) {
+			replaceRange(lineStart, at, '');
+			return true;
+		}
+		replaceRange(at, at, `\n${quote[1]}> `);
+		return true;
+	}
+	return false;
+}
+
+// --------------------------------------------------- ショートカット一覧
+
+const SHORTCUTS = [
+	['書く', ''],
+	['⌘B', '太字'],
+	['⌘I', '斜体'],
+	['⌘K', 'リンク'],
+	['⌘⇧K', 'URL を埋め込む'],
+	['Tab', 'インデント'],
+	['Enter', '箇条書き・引用を続ける（空の項目で押すと抜ける）'],
+	['⌘Z / ⌘⇧Z', '取り消し・やり直し'],
+	['画面', ''],
+	['⌘⇧F', '集中モード（本文だけにする）'],
+	['Esc', '集中モードをやめる'],
+	['⌘/', 'この一覧'],
+	['保存と公開', ''],
+	['⌘S', 'すぐ保存する（ふだんは自動で保存される）'],
+	['貼り付け', '画像はそのまま貼り付け・ドロップで入る'],
+];
+
+function showShortcuts() {
+	const rows = SHORTCUTS.map(([key, desc]) =>
+		desc === ''
+			? `<div class="grp">${escapeHtml(key)}</div>`
+			: `<kbd>${escapeHtml(key)}</kbd><span>${escapeHtml(desc)}</span>`,
+	).join('');
+	return showForm('ショートカット', `<div class="keys">${rows}</div>`, [
+		{ value: null, label: '閉じる', primary: true },
+	]);
 }
 
 // --------------------------------------------------------------- 埋め込み
@@ -1202,13 +1473,21 @@ el.body.addEventListener('drop', (e) => {
 	}
 });
 
-// Tab でインデント、⌘S で保存、⌘B/⌘I/⌘K
+// Tab でインデント、Enter で箇条書きを続ける、⌘S で保存、⌘B/⌘I/⌘K
 el.body.addEventListener('keydown', (e) => {
 	if (e.key === 'Tab') {
 		e.preventDefault();
 		insertAtCursor('\t');
+		return;
+	}
+	if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+		continueList(e);
 	}
 });
+
+// カーソルが別の見出しの下に移ったら、プレビューもそこへ動かす
+el.body.addEventListener('keyup', maybeSync);
+el.body.addEventListener('click', maybeSync);
 document.addEventListener('keydown', (e) => {
 	if (!(e.metaKey || e.ctrlKey)) return;
 	const key = e.key.toLowerCase();
@@ -1225,14 +1504,44 @@ document.addEventListener('keydown', (e) => {
 		e.preventDefault();
 		if (e.shiftKey) promptEmbed();
 		else MD_ACTIONS.link();
+	} else if (key === 'f' && e.shiftKey) {
+		e.preventDefault();
+		setZen(!document.body.classList.contains('zen'));
+	} else if (key === '/') {
+		e.preventDefault();
+		showShortcuts();
 	}
 });
+
+// Esc で集中モードを抜ける（モーダルが開いているときはモーダル優先）
+document.addEventListener('keydown', (e) => {
+	if (e.key === 'Escape' && el.modal.hidden && document.body.classList.contains('zen')) {
+		setZen(false);
+	}
+});
+
+// 記事の設定の開閉
+el.metaToggle.addEventListener('click', () => setMetaOpen(el.meta.hidden));
+el.metaDigest.addEventListener('click', () => setMetaOpen(true));
+
+// 集中モード・ショートカット一覧
+el.zen.addEventListener('click', () => setZen(!document.body.classList.contains('zen')));
+el.help.addEventListener('click', () => showShortcuts());
+
+// プレビューの追従と「記事だけ」表示
+el.sync.addEventListener('click', () => setSync(!prefs.sync));
+el.articleOnly.addEventListener('click', () => setArticleOnly(!prefs.articleOnly));
 
 window.addEventListener('beforeunload', () => {
 	if (state.saveTimer) flushSave();
 });
 
 // ------------------------------------------------------------------- 起動
+
+setMetaOpen(metaIsOpen());
+setSync(prefs.sync);
+setArticleOnly(prefs.articleOnly);
+el.frame.addEventListener('load', onPreviewLoad);
 
 refreshState()
 	.then((data) => {
