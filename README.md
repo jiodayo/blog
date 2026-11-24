@@ -19,11 +19,12 @@ npm run preview  # ビルド結果をローカルで表示
 
 ## 記事を書く（エディタを使う）
 
-**`ブログ.app` をダブルクリックする。** これがいちばん楽。
+**`ブログ.app` を開く。** これがいちばん楽。アプリケーションフォルダに
+入っているので、Launchpad や Spotlight（`⌘Space` で「ブログ」）から出てくる。
 ブラウザもターミナルも開かず、独立したウィンドウでエディタが立ち上がる。
 Dock に入れておくとなお楽。閉じればエディタも dev サーバーも一緒に終わる。
 
-アプリが無いときは、一度だけこれを実行して作る。
+アプリが無いときは、一度だけこれを実行して作る。`/Applications` に入る。
 
 ```bash
 bash tools/mac-app/build.sh
@@ -91,7 +92,7 @@ npm run editor
 tools/mac-app/
   main.swift       ウィンドウ・メニュー・node の起動と後始末
   make-icon.swift  アイコンを描く（画像ファイルを置かずに済ませるため）
-  build.sh         上の二つから ブログ.app を組み立てる
+  build.sh         上の二つから ブログ.app を組み立てて /Applications に入れる
 ```
 
 - Electron は使っていない。必要なのは Xcode Command Line Tools だけで、
@@ -104,6 +105,10 @@ tools/mac-app/
   二重に立ち上げずそちらにつなぐ
 - `ブログ.app` 自体は git に入れていない（作れば出来るものなので）。
   フォルダごと別の Mac に移したときは `build.sh` を流し直す
+- 置き場所は `/Applications`。ブログのフォルダの中に置くと、アプリの一覧に
+  出てこなくて見失う。別の場所にしたいときは `build.sh ~/Applications` のように渡す
+- アプリはブログのフォルダの場所を Info.plist の `BlogProjectPath` で覚えている。
+  フォルダを動かしたら `build.sh` を流し直す
 
 ## VS Code で書く
 
