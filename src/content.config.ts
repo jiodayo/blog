@@ -18,6 +18,9 @@ const blog = defineCollection({
 			draft: z.boolean().default(false),
 			// 記事につけるタグ。書かなければ空配列になる
 			tags: z.array(z.string()).default([]),
+			// true にした記事だけ、本文の前に目次が出る。
+			// 短い記事に目次が付くと邪魔なので、既定では出さない。
+			toc: z.boolean().default(false),
 		}),
 });
 

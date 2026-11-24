@@ -36,6 +36,7 @@ const el = {
 	updatedDate: $('f-updatedDate'),
 	slug: $('f-slug'),
 	draft: $('f-draft'),
+	toc: $('f-toc'),
 	body: $('f-body'),
 	toolbar: $('toolbar'),
 	image: $('btn-image'),
@@ -146,7 +147,7 @@ function renderList() {
 /** 記事だけにある項目を、ページを開いているときは隠す */
 function applyKindVisibility() {
 	const isPost = state.kind === 'post';
-	for (const node of [el.tags, el.pubDate, el.updatedDate, el.slug, el.draft]) {
+	for (const node of [el.tags, el.pubDate, el.updatedDate, el.slug, el.draft, el.toc]) {
 		node.closest('.field')?.toggleAttribute('hidden', !isPost);
 	}
 	el.tagSuggestRow.hidden = !isPost || el.tagSuggest.children.length === 0;
@@ -251,6 +252,7 @@ function formValues() {
 		updatedDate: el.updatedDate.value,
 		heroImage: state.heroImage,
 		draft: el.draft.checked,
+		toc: el.toc.checked,
 		body: el.body.value,
 	};
 }
@@ -302,6 +304,7 @@ async function openPost(slug) {
 	el.updatedDate.value = post.updatedDate;
 	el.slug.value = post.slug;
 	el.draft.checked = post.draft;
+	el.toc.checked = post.toc === true;
 	el.body.value = post.body;
 	el.body.setSelectionRange(0, 0);
 	el.editor.hidden = false;
@@ -821,6 +824,7 @@ function renderMetaDigest() {
 		parts.push(tags.length ? escapeHtml(tags.join('、')) : 'タグなし');
 		if (el.pubDate.value) parts.push(escapeHtml(el.pubDate.value.replaceAll('-', '/')));
 		if (state.heroImage) parts.push('ヘッダ画像あり');
+		if (el.toc.checked) parts.push('目次あり');
 		if (el.slug.value) parts.push(`/${escapeHtml(el.slug.value)}`);
 	} else {
 		parts.push(el.description.value ? escapeHtml(el.description.value) : '説明なし');
@@ -1348,7 +1352,16 @@ el.list.addEventListener('click', (e) => {
 	if (li) openPost(li.dataset.slug).catch((err) => alert(err.message));
 });
 
-for (const node of [el.title, el.description, el.tags, el.pubDate, el.updatedDate, el.draft, el.body]) {
+for (const node of [
+	el.title,
+	el.description,
+	el.tags,
+	el.pubDate,
+	el.updatedDate,
+	el.draft,
+	el.toc,
+	el.body,
+]) {
 	node.addEventListener('input', scheduleSave);
 	node.addEventListener('change', scheduleSave);
 }

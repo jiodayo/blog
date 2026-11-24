@@ -13,9 +13,10 @@ export async function getStaticPaths() {
 type Props = CollectionEntry<'blog'>;
 
 const post = Astro.props;
-const { Content } = await render(post);
+// headings は見出しの一覧（深さ・リンク先・文字）。目次を作るのに使う。
+const { Content, headings } = await render(post);
 ---
 
-<BlogPost {...post.data}>
+<BlogPost {...post.data} headings={headings}>
 	<Content />
 </BlogPost>

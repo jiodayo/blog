@@ -1,0 +1,76 @@
+---
+/**
+ * 記事の見出しから目次を作る。
+ *
+ * 見出しには id が自動で振られるので、そこへのリンクを並べるだけでよい。
+ * 拾うのは ## と ### まで。#### 以降まで出すと、目次のほうが本文より
+ * 長くなってしまう。
+ *
+ * 出すかどうかは記事ごとの toc で決める（content.config.ts）。
+ */
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+	headings: MarkdownHeading[];
+}
+
+const { headings } = Astro.props;
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+	items.length > 0 && (
+		<nav class="toc" aria-labelledby="toc-title">
+			<p class="toc-title" id="toc-title">
+				目次
+			</p>
+			<ol>
+				{items.map((h) => (
+					<li class:list={[`depth-${h.depth}`]}>
+						<a href={`#${h.slug}`}>{h.text}</a>
+					</li>
+				))}
+			</ol>
+		</nav>
+	)
+}
+
+<style>
+	.toc {
+		margin: 0 0 2.5em 0;
+		padding: 1.1em 1.4em;
+		border: 1px solid rgb(var(--gray-light));
+		border-radius: 10px;
+		background: rgba(var(--gray-light), 35%);
+		font-size: 0.95em;
+	}
+	.toc-title {
+		margin: 0 0 0.6em 0;
+		color: rgb(var(--gray-dark));
+		font-size: 0.9em;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+	}
+	.toc ol {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.toc li {
+		margin: 0.35em 0;
+		line-height: 1.5;
+	}
+	/* ### は一段下げて、親子が分かるようにする */
+	.toc li.depth-3 {
+		margin-left: 1.2em;
+		font-size: 0.92em;
+	}
+	.toc a {
+		color: rgb(var(--gray-dark));
+		text-decoration: none;
+	}
+	.toc a:hover {
+		color: var(--accent);
+		text-decoration: underline;
+	}
+</style>

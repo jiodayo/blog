@@ -173,6 +173,7 @@ function serializePost(data, body) {
 	const tags = normalizeTags(data.tags);
 	if (tags.length > 0) lines.push(`tags: [${tags.map(yamlString).join(', ')}]`);
 	if (data.draft) lines.push('draft: true');
+	if (data.toc) lines.push('toc: true');
 	return `---\n${lines.join('\n')}\n---\n\n${body.replace(/^\s+|\s+$/g, '')}\n`;
 }
 
@@ -207,6 +208,7 @@ async function listPosts() {
 			pubDate: data.pubDate || '',
 			tags: normalizeTags(data.tags),
 			draft: data.draft === true,
+			toc: data.toc === true,
 			// .mdx は一覧には出すが、このエディタでは開かない
 			readOnly: name.endsWith('.mdx'),
 		});
@@ -232,6 +234,7 @@ async function readPost(slug) {
 		heroImage: data.heroImage || '',
 		tags: normalizeTags(data.tags),
 		draft: data.draft === true,
+		toc: data.toc === true,
 		body,
 	};
 }
