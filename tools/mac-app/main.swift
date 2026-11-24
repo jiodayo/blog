@@ -375,14 +375,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 			decisionHandler(.allow)
 			return
 		}
-		let isLocal = url.host == "127.0.0.1" || url.host == "localhost"
-		if isLocal {
+		let scheme = (url.scheme ?? "").lowercased()
+
+		// about:blank / blob: / data: はページの組み立ての途中で出てくるもので、
+		// 外のブラウザに渡すと「開くアプリがありません」と言われてしまう。
+		// プレビューは iframe を作り直すたびに about:blank を一度通る。
+		if ["about", "blob", "data"].contains(scheme) {
 			decisionHandler(.allow)
 			return
 		}
-		// 画像をウィンドウに落としたときに file:// へ飛ぶのも止める
-		if url.isFileURL {
+		// 画像をウィンドウに落としたときに file:// へ飛ぶのは止める
+		if scheme == "file" || url.isFileURL {
 			decisionHandler(.cancel)
+			return
+		}
+		let isLocal = url.host == "127.0.0.1" || url.host == "localhost"
+		if isLocal {
+			decisionHandler(.allow)
 			return
 		}
 		NSWorkspace.shared.open(url)
@@ -394,7 +403,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 		_ webView: WKWebView, createWebViewWith config: WKWebViewConfiguration,
 		for action: WKNavigationAction, windowFeatures: WKWindowFeatures
 	) -> WKWebView? {
-		if let url = action.request.url { NSWorkspace.shared.open(url) }
+		// ここも同じ。中身の無い window.open() は about:blank で来る。
+		if let url = action.request.url,
+			let scheme = url.scheme?.lowercased(),
+			!["about", "blob", "data", "file"].contains(scheme)
+		{
+			NSWorkspace.shared.open(url)
+		}
 		return nil
 	}
 
