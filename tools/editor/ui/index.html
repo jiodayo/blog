@@ -111,6 +111,28 @@
 					<button id="btn-delete" class="danger" title="この記事を削除">削除</button>
 				</div>
 
+				<!-- カーソルが画像の行にあるときだけ出る。幅を後から変えるための列 -->
+				<div class="imagebar" id="imagebar" hidden>
+					<span class="imagebar-label">画像の幅</span>
+					<input
+						id="img-width"
+						type="range"
+						min="10"
+						max="100"
+						step="5"
+						value="100"
+						aria-label="画像の幅"
+					/>
+					<output id="img-width-out" for="img-width">100%</output>
+					<span class="imagebar-presets">
+						<button type="button" data-width="25">小</button>
+						<button type="button" data-width="50">半分</button>
+						<button type="button" data-width="75">大</button>
+						<button type="button" data-width="100">原寸</button>
+					</span>
+					<span class="imagebar-hint">本文の幅に対する割合。狭くすると真ん中に寄る</span>
+				</div>
+
 				<textarea
 					id="f-body"
 					class="body"

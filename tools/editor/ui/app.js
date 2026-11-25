@@ -37,6 +37,9 @@ const el = {
 	slug: $('f-slug'),
 	draft: $('f-draft'),
 	toc: $('f-toc'),
+	imagebar: $('imagebar'),
+	imgWidth: $('img-width'),
+	imgWidthOut: $('img-width-out'),
 	body: $('f-body'),
 	toolbar: $('toolbar'),
 	image: $('btn-image'),
@@ -284,6 +287,7 @@ async function openPage(name) {
 	el.body.setSelectionRange(0, 0);
 	el.editor.hidden = false;
 	applyKindVisibility();
+	renderImageBar();
 	renderCounts();
 	state.listSignature = null;
 	renderList();
@@ -311,6 +315,7 @@ async function openPost(slug) {
 	setHero(post.heroImage);
 	renderTagSuggestions();
 	applyKindVisibility();
+	renderImageBar();
 	renderCounts();
 	state.listSignature = null;
 	renderList();
@@ -830,6 +835,67 @@ function renderMetaDigest() {
 		parts.push(el.description.value ? escapeHtml(el.description.value) : '説明なし');
 	}
 	el.metaDigest.innerHTML = parts.join('<span class="sep">·</span>');
+}
+
+// --------------------------------------------------------- 画像の大きさ
+
+/**
+ * 本文の中の画像ひとつ。幅は Markdown の「タイトル」の場所を借りて
+ * "w=50" のように書く（src/lib/image-width.ts が HTML にするときに拾う）。
+ */
+const IMAGE_RE = /!\[([^\]]*)\]\(\s*([^()\s]+)(?:\s+"([^"]*)")?\s*\)/;
+const WIDTH_RE = /^w=(\d{1,3})$/;
+
+/** カーソルのある行の画像を返す。無ければ null。 */
+function imageAtCursor() {
+	const v = el.body.value;
+	const pos = el.body.selectionStart;
+	const lineStart = v.lastIndexOf('\n', pos - 1) + 1;
+	const nl = v.indexOf('\n', pos);
+	const lineEnd = nl === -1 ? v.length : nl;
+	const m = IMAGE_RE.exec(v.slice(lineStart, lineEnd));
+	if (!m) return null;
+
+	const title = m[3] ?? '';
+	// 幅以外のタイトルが書いてあるときは触らない。手で書いたものを
+	// 幅の指定で上書きしてしまわないように。
+	if (title && !WIDTH_RE.test(title)) return null;
+
+	return {
+		start: lineStart + m.index,
+		end: lineStart + m.index + m[0].length,
+		alt: m[1],
+		path: m[2],
+		width: title ? Number(WIDTH_RE.exec(title)[1]) : 100,
+	};
+}
+
+/** 画像の行にいるときだけ、幅の列を出す */
+function renderImageBar() {
+	const img = state.current ? imageAtCursor() : null;
+	el.imagebar.hidden = !img;
+	if (!img) return;
+	el.imgWidth.value = String(img.width);
+	el.imgWidthOut.textContent = `${img.width}%`;
+}
+
+/** カーソルのある画像の幅を書き換える */
+function setImageWidth(pct) {
+	const img = imageAtCursor();
+	if (!img) return;
+	const width = Math.min(100, Math.max(10, Math.round(pct)));
+	// 原寸のときは指定そのものを消す。本文を余計な記号で汚さない。
+	const next =
+		width >= 100
+			? `![${img.alt}](${img.path})`
+			: `![${img.alt}](${img.path} "w=${width}")`;
+	const caret = el.body.selectionStart;
+	// replaceRange 経由なので ⌘Z で元に戻せる
+	replaceRange(img.start, img.end, next);
+	const limit = img.start + next.length;
+	const at = Math.min(caret, limit);
+	el.body.setSelectionRange(at, at);
+	renderImageBar();
 }
 
 // ----------------------------------------------------------- 集中モード
@@ -1501,6 +1567,21 @@ el.body.addEventListener('keydown', (e) => {
 // カーソルが別の見出しの下に移ったら、プレビューもそこへ動かす
 el.body.addEventListener('keyup', maybeSync);
 el.body.addEventListener('click', maybeSync);
+
+// 画像の幅の列
+for (const ev of ['keyup', 'click', 'input', 'focus']) {
+	el.body.addEventListener(ev, renderImageBar);
+}
+// つまみを動かしている間は数字だけ動かす。離した時点で本文に書く。
+// 一目盛りごとに書き換えると、⌘Z が何十回分にもなってしまう。
+el.imgWidth.addEventListener('input', () => {
+	el.imgWidthOut.textContent = `${el.imgWidth.value}%`;
+});
+el.imgWidth.addEventListener('change', () => setImageWidth(Number(el.imgWidth.value)));
+el.imagebar.addEventListener('click', (e) => {
+	const btn = e.target.closest('[data-width]');
+	if (btn) setImageWidth(Number(btn.dataset.width));
+});
 document.addEventListener('keydown', (e) => {
 	if (!(e.metaKey || e.ctrlKey)) return;
 	const key = e.key.toLowerCase();

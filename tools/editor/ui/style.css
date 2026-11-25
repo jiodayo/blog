@@ -852,3 +852,55 @@ body.zen .headline input {
 .keys .grp:first-child {
 	margin-top: 0;
 }
+
+/* 画像の幅を変える列。カーソルが画像の行にあるときだけ出る。 */
+.imagebar {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+	padding: 0.45rem 0.9rem;
+	border-bottom: 1px solid var(--border);
+	background: var(--bg-sub);
+	font-size: 0.82rem;
+}
+.imagebar[hidden] {
+	display: none;
+}
+.imagebar-label {
+	color: var(--text-dim);
+}
+.imagebar input[type='range'] {
+	width: 11rem;
+	accent-color: var(--accent);
+}
+.imagebar output {
+	min-width: 3em;
+	color: var(--text);
+	font-variant-numeric: tabular-nums;
+}
+.imagebar-presets {
+	display: flex;
+	gap: 0.3rem;
+}
+.imagebar-presets button {
+	padding: 0.15rem 0.6rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--bg);
+	color: var(--text-dim);
+	font-size: 0.78rem;
+	cursor: pointer;
+}
+.imagebar-presets button:hover {
+	border-color: var(--accent);
+	color: var(--text);
+}
+.imagebar-hint {
+	color: var(--text-dim);
+	opacity: 0.8;
+}
+/* 集中モードでは本文だけにしたいので引っ込める */
+body.zen .imagebar {
+	display: none;
+}

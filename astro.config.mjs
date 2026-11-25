@@ -4,6 +4,7 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import { defineConfig } from 'astro/config';
 import { satteri } from '@astrojs/markdown-satteri';
+import { imageWidth } from './src/lib/image-width';
 
 // ============================================================
 //  site: このサイトの公開URL。RSS・sitemap・OG画像の絶対URLに使われる。
@@ -23,6 +24,8 @@ export default defineConfig({
 		// 既定では "Footnotes" と "Back to reference 1" が入る。
 		// 見出しは読み上げ用に隠されているので、global.css の .footnotes で表に出している。
 		processor: satteri({
+			// 画像の幅の指定（![](x.jpg "w=50")）を style に移す
+			hastPlugins: [imageWidth],
 			features: {
 				gfm: {
 					footnotes: {
