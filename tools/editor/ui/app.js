@@ -455,18 +455,74 @@ async function updatePreview({ wait = true } = {}) {
 	el.previewEmpty.hidden = true;
 }
 
+// 裏で読み込み中のプレビュー。次の差し替えが来たら捨てる。
+let pendingFrame = null;
+
+function dropPendingFrame() {
+	if (!pendingFrame) return;
+	clearTimeout(pendingFrame.timer);
+	pendingFrame.frame.remove();
+	pendingFrame = null;
+}
+
 /**
- * iframe は src を貼り替えると白いままになることがあるので、
- * 要素ごと新しく作って差し替える。
+ * プレビューを新しい内容に差し替える。
+ *
+ * 同じ iframe の src を貼り替えると、読み込みの間だけ白い画面になる。
+ * 一文字打つたびにそれが起きるので、画面がちらついて書きにくい。
+ *
+ * そこで、古い画面を出したまま新しい iframe を裏で読み込み、出来上がって
+ * から入れ替える。白い時間がなくなるので、内容だけが静かに変わる。
  */
 function swapFrame(url) {
+	dropPendingFrame();
+	const old = el.frame;
 	const next = document.createElement('iframe');
-	next.id = 'preview-frame';
 	next.title = 'プレビュー';
+	next.className = 'loading'; // 出来上がるまで見せない
 	next.src = url;
-	next.addEventListener('load', onPreviewLoad);
-	el.frame.replaceWith(next);
-	el.frame = next;
+
+	const show = () => {
+		if (pendingFrame?.frame !== next) return;
+		clearTimeout(pendingFrame.timer);
+		pendingFrame = null;
+		el.frame = next;
+		const carried = carryScroll(old, next);
+		// 「記事だけ」は見せる前に効かせる。あとからだと、隠すはずの
+		// ヘッダが一瞬だけ見えてしまう。
+		applyArticleOnly();
+		next.classList.remove('loading');
+		old.remove();
+		// id は古いほうを外してから。重なっている間に同じ id が2つできない。
+		next.id = 'preview-frame';
+		// 位置を引き継げたときは、そのまま見ていた場所に留める。
+		if (!carried) {
+			lastHeading = -1;
+			maybeSync();
+		}
+	};
+
+	next.addEventListener('load', show);
+	// 読み込みが終わらないときでも、古い画面を出し続けない
+	pendingFrame = { frame: next, timer: setTimeout(show, 5000) };
+	old.after(next);
+}
+
+/**
+ * 新しいプレビューを、いま見ている位置のまま出す。
+ * 引き継げたら true。
+ */
+function carryScroll(from, to) {
+	try {
+		const a = from.contentWindow;
+		const b = to.contentWindow;
+		if (!a || !b) return false;
+		if (a.scrollX === 0 && a.scrollY === 0) return false;
+		b.scrollTo(a.scrollX, a.scrollY);
+		return true;
+	} catch {
+		return false; // 読み込み前などは諦める
+	}
 }
 
 let reloadTimer = null;
@@ -1086,7 +1142,9 @@ const SHORTCUTS = [
 	['⌘K', 'リンク'],
 	['⌘⇧K', 'URL を埋め込む'],
 	['Tab', 'インデント'],
-	['Enter', '箇条書き・引用を続ける（空の項目で押すと抜ける）'],
+	['Enter', '改行する（段落は変わらない）。箇条書き・引用は続く'],
+	['⇧Enter', '箇条書き・引用を続けずに改行する'],
+	['Enter 2回', '1行あいて、段落が変わる'],
 	['⌘Z / ⌘⇧Z', '取り消し・やり直し'],
 	['画面', ''],
 	['⌘⇧F', '集中モード（本文だけにする）'],

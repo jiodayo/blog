@@ -327,7 +327,12 @@ hr {
    割合は style="--w: 50%" で渡ってくる。クラスではなくこの変数の有無で選ぶ
    理由は src/lib/image-width.ts を参照。
    本文より狭い画像を左に置くと字下げの失敗に見えるので、真ん中に寄せる。 */
-.prose img[style*='--w'] {
+/* 幅を決めた画像（![](x.jpg "w=50")）。
+   記事だけでなく About のような固定ページでも効かせたいので、.prose の
+   外にも掛けている。図（figure）の中は幅 100% の指定があるため、
+   そちらより強いセレクタも並べておく。 */
+img[style*='--w'],
+.prose figure img[style*='--w'] {
 	display: block;
 	width: var(--w);
 	height: auto;
